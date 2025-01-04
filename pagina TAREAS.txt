@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soluciones de Tareas Venezuela</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: url('https://via.placeholder.com/1920x1080?text=Fondo+Tecnol%C3%B3gico') no-repeat center center fixed;
+            background-size: cover;
+            color: #333;
+        }
+        header {
+            background-color: rgba(76, 175, 80, 0.9);
+            color: white;
+            padding: 1rem 0;
+            text-align: center;
+        }
+        nav {
+            display: flex;
+            justify-content: center;
+            background-color: rgba(51, 51, 51, 0.9);
+        }
+        nav a {
+            color: white;
+            padding: 1rem;
+            text-decoration: none;
+            text-align: center;
+        }
+        nav a:hover {
+            background-color: rgba(87, 87, 87, 0.9);
+        }
+        .container {
+            padding: 2rem;
+            max-width: 800px;
+            margin: auto;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+        }
+        h1 {
+            color: #333;
+        }
+        footer {
+            text-align: center;
+            padding: 1rem;
+            background-color: rgba(51, 51, 51, 0.9);
+            color: white;
+            margin-top: 2rem;
+        }
+        .cta {
+            background-color: rgba(76, 175, 80, 0.9);
+            color: white;
+            text-align: center;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 5px;
+        }
+        .cta a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .cta a:hover {
+            text-decoration: underline;
+        }
+        .tutores {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+        }
+        .tutor {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 1rem;
+            background-color: #fff;
+            width: 250px;
+            text-align: center;
+        }
+        .tutor img {
+            border-radius: 50%;
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Soluciones de Tareas Venezuela</h1>
+        <p>¡Resolviendo tus tareas al mejor costo, adaptado al contexto venezolano!</p>
+    </header>
+    <nav>
+        <a href="#inicio">Inicio</a>
+        <a href="#servicios">Servicios</a>
+        <a href="#tutores">Tutores</a>
+        <a href="#faq">Preguntas Frecuentes</a>
+        <a href="#contacto">Contacto</a>
+    </nav>
+    <div class="container" id="inicio">
+        <h1>Bienvenido</h1>
+        <p>Ofrecemos soluciones rápidas y económicas para tus tareas escolares. Nuestro objetivo es ayudarte a alcanzar el éxito académico sin estrés, adaptándonos a tus necesidades en Venezuela.</p>
+        <div class="cta">
+            <p>¿Tienes una tarea pendiente? <a href="#contacto">Contáctanos ahora</a></p>
+        </div>
+    </div>
+    <div class="container" id="servicios">
+        <h1>Servicios</h1>
+        <ul>
+            <li>Resolución de problemas matemáticos</li>
+            <li>Asistencia en física y química</li>
+            <li>Redacción de ensayos y trabajos</li>
+            <li>Corrección y edición de textos</li>
+        </ul>
+        <div class="cta">
+            <p>Realiza tu pago de manera segura utilizando:</p>
+            <ul>
+                <li>Transferencias Bancarias Nacionales</li>
+                <li>Pago Móvil</li>
+                <li>Zelle</li>
+            </ul>
+        </div>
+    </div>
+    <div class="container" id="tutores">
+        <h1>Conoce a Nuestros Tutores</h1>
+        <div class="tutores">
+            <div class="tutor">
+                <img src="https://via.placeholder.com/100" alt="Tutor 1">
+                <h2>Jonnathan Seco</h2>
+                <p>Ingeniero Especialista en matemáticas y física.</p>
+            </div>
+            <div class="tutor">
+                <img src="https://via.placeholder.com/100" alt="Tutor 2">
+                <h2>Dixon Malpica</h2>
+                <p>Experto en redacción y corrección de textos.</p>
+            </div>
+            <div class="tutor">
+                <img src="https://via.placeholder.com/100" alt="Tutor 3">
+                <h2>Angel Garcia</h2>
+                <p>Ingeniero químico.</p>
+            </div>
+        </div>
+    </div>
+    <div class="container" id="faq">
+        <h1>Preguntas Frecuentes</h1>
+        <h2>¿Cómo funciona el sistema de pagos?</h2>
+        <p>Debes abonar el 50% del precio de la tarea al momento de solicitarla. Una vez que recibas la tarea y estés satisfecho, deberás completar el resto del pago.</p>
+        <h2>¿Qué métodos de pago aceptan?</h2>
+        <p>Aceptamos transferencias bancarias nacionales, Pago Móvil y Zelle para garantizar comodidad y flexibilidad.</p>
+    </div>
+    <div class="container" id="contacto">
+        <h1>Contacto</h1>
+        <p>Para enviarnos tus tareas o preguntas, completa el siguiente formulario:</p>
+        <form action="#" method="post" enctype="multipart/form-data">
+            <label for="nombre">Nombre:</label><br>
+            <input type="text" id="nombre" name="nombre" required><br><br>
+            <label for="correo">Correo Electrónico:</label><br>
+            <input type="email" id="correo" name="correo" required><br><br>
+            <label for="mensaje">Mensaje o detalles de tu tarea:</label><br>
+            <textarea id="mensaje" name="mensaje" rows="5" required></textarea><br><br>
+            <label for="archivo">Adjuntar archivo:</label><br>
+            <input type="file" id="archivo" name="archivo" accept=".pdf,.doc,.docx,.jpg,.png,.txt" required><br><br>
+            <button type="submit">Enviar</button>
+        </form>
+    </div>
+    <footer>
+        <p>&copy; 2025 Soluciones de Tareas Venezuela. Todos los derechos reservados.</p>
+    </footer>
+</body>
+</html>
