@@ -15,7 +15,11 @@ function Afirmar([bool]$Condicion, [string]$Mensaje) {
 }
 function Instalar([string]$Nombre) {
   $p = Start-Process -FilePath $Instalador -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$registros\$Nombre.log") -Wait -PassThru
+  $log = Get-Content (Join-Path $datos 'logs\instalacion.log') -Encoding UTF8
+  Copy-Item (Join-Path $datos 'logs\instalacion.log') "$registros\$Nombre-configuracion.log"
+  if ($p.ExitCode -ne 0) { $log | Select-Object -Last 30 | ForEach-Object { Write-Host "    | $_" } }
   Afirmar ($p.ExitCode -eq 0) "el instalador terminó con código 0 ($Nombre)"
+  Afirmar ($log[-1] -match 'Instalación terminada') "la configuración terminó sin errores ($Nombre)"
 }
 function Resultado {
   $r = @{}

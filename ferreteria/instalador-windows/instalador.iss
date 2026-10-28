@@ -66,6 +66,7 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 [Code]
 var
   TextoFinal: String;
+  ConfiguracionFallida: Boolean;
 
 { Antes de copiar archivos se detienen los servicios, para poder reemplazar node.exe y postgres.exe. }
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -125,12 +126,24 @@ begin
      and (Codigo = 0) then
     ArmarTextoFinal
   else
+  begin
+    ConfiguracionFallida := True;
     SuppressibleMsgBox(
       'No se pudo completar la configuración del sistema (código ' + IntToStr(Codigo) + ').' + #13#10#13#10 +
       'Revise el registro en:' + #13#10 + ExpandConstant('{commonappdata}\LaCasaDelInyector\logs\instalacion.log') + #13#10#13#10 +
       'Puede volver a ejecutar el instalador para reintentar; los datos no se pierden.',
       mbCriticalError, MB_OK, IDOK);
+  end;
   WizardForm.ProgressGauge.Style := npbstNormal;
+end;
+
+{ Código de salida distinto de cero si la configuración falló (útil en instalaciones silenciosas). }
+function GetCustomSetupExitCode: Integer;
+begin
+  if ConfiguracionFallida then
+    Result := 1
+  else
+    Result := 0;
 end;
 
 procedure CurPageChanged(CurPageID: Integer);

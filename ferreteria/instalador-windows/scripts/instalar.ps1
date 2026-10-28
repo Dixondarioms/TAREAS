@@ -107,7 +107,8 @@ try {
     & (Join-Path $PSScriptRoot 'respaldo.ps1') -Motivo 'antes-de-actualizar'
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo hacer el respaldo previo a la actualización' }
   }
-  Remove-Item Env:\PGPASSWORD
+  # respaldo.ps1 también la borra al terminar, por eso se ignora si ya no existe.
+  Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
 
   # ---------------------------------------------------------------- servicio de la API
   Detener-Servicio $NombreServicioApi
