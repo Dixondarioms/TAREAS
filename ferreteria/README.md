@@ -1,0 +1,229 @@
+# La Casa del Inyector San Juan, C.A. — Sistema de gestión
+
+Software de gestión de **La Casa del Inyector San Juan, C.A.**, ferretería pequeña o mediana en Venezuela, pensado para **instalarse en un servidor dentro de la tienda** y funcionar aunque falle internet.
+
+Esta versión corresponde a la **fase 1** del plan: catálogo, precios en dos monedas y tasa BCV.
+
+| Módulo | Qué hace |
+|---|---|
+| Usuarios y roles | Administrador, gerente, almacén y cajero. El cajero no ve costos ni márgenes. |
+| Tasa de cambio | Consulta automática de la tasa oficial del BCV (USD y EUR), carga manual cuando no hay internet e historial. |
+| Productos | Código interno, descripción, categoría jerárquica, marca, ubicación, stock mínimo y máximo, IVA (general, reducida o exento). |
+| Unidades y presentaciones | Venta por unidad, metro, kilo, litro o galón. Presentaciones como caja ×100 o rollo ×100 m, cada una con su código de barras. |
+| Precios | Listas de precio (público, mayor, contratista). Cada precio va por margen sobre el costo o es fijo. Todo se muestra en **USD y Bs con IVA**. |
+| Ajuste masivo | «El proveedor X subió 8 %»: se ajustan costos o precios por proveedor, marca o categoría, con vista previa. |
+| Importación | Carga o actualización del catálogo desde Excel (.xlsx) o CSV, con revisión previa y reporte de errores por fila. |
+| Proveedores | Ficha con RIF validado (dígito verificador del SENIAT) y códigos y costos por producto. |
+| Búsqueda | Por palabras, sin importar acentos, por código o código de barras, y tolerante a errores de tipeo («tornilo»). |
+| Respaldos | Copia diaria automática de la base de datos y script de restauración. |
+
+## Arquitectura
+
+```
+ Navegadores en la red local (cajas, oficina, tablet)
+                 │  http://IP-DEL-SERVIDOR
+   ┌─────────────▼──────────────────────────────────┐
+   │ Servidor local (Docker Compose)                │
+   │  web       nginx + aplicación React            │
+   │  api       NestJS (Node 22)  ── /api/docs      │
+   │  db        PostgreSQL 16 (volumen persistente) │
+   │  respaldo  pg_dump diario → ./respaldos        │
+   └────────────────────────────────────────────────┘
+                 │ solo para la tasa BCV
+              Internet
+```
+
+- **Dinero exacto.** Ningún monto usa coma flotante: se guardan como `numeric` en PostgreSQL y se calculan con `decimal.js`.
+- **Moneda base USD.** Costos y precios se guardan en USD. El precio en Bs se calcula con la tasa vigente y el redondeo configurado.
+- **Tasa por fecha valor.** Rige la tasa con la fecha valor más reciente que no sea posterior a hoy. Las tasas nunca se modifican: una corrección es un registro nuevo.
+- **Esquema por migraciones.** La base de datos se actualiza sola al iniciar la API, con migraciones revisadas y versionadas.
+
+## Instalación en Windows con el instalador (.exe)
+
+Es la forma más sencilla: un solo archivo instala todo. Incluye la base de datos PostgreSQL, la aplicación, los respaldos diarios y el acceso desde la red. No necesita Docker ni internet para funcionar.
+
+1. Descargue `Instalador-LaCasaDelInyector-X.Y.Z.exe` desde la página **Releases** del repositorio.
+2. Ejecútelo en la computadora que será el servidor de la tienda (Windows 10 u 11 de 64 bits). Pedirá permiso de administrador.
+   - Si aparece «Windows protegió su PC», pulse **Más información** y luego **Ejecutar de todas formas**. Ocurre porque el instalador no está firmado digitalmente.
+3. Al terminar, el asistente muestra:
+   - la dirección para entrar desde las demás computadoras, por ejemplo `http://192.168.1.50/`;
+   - el usuario `admin` y su **clave inicial**. Anótela y cámbiela al entrar.
+4. En el escritorio queda el acceso directo **La Casa del Inyector**.
+
+| Qué | Dónde |
+|---|---|
+| Programa | `C:\Program Files\LaCasaDelInyector` |
+| Datos, respaldos y registros | `C:\ProgramData\LaCasaDelInyector` |
+| Servicios de Windows | `LCI-BaseDatos` y `LCI-API`, con inicio automático |
+| Respaldo diario | Tarea programada a las 23:00. Si el equipo estaba apagado, se hace al encenderlo. |
+
+- En el menú Inicio, bajo **La Casa del Inyector**, están la carpeta de respaldos, **Restaurar un respaldo** y los registros de diagnóstico.
+- **Actualizar:** ejecute el `.exe` de la nueva versión. Antes de actualizar se hace un respaldo automático y los datos se conservan.
+- **Desinstalar:** desde «Agregar o quitar programas». Los datos se conservan, y si vuelve a instalar se recuperan.
+- Mantenga ese equipo encendido mientras la tienda trabaje. Configure Windows para que **no entre en suspensión**.
+
+El instalador se compila y se prueba automáticamente en un Windows real con GitHub Actions (`.github/workflows/instalador-windows.yml`). Para publicar una versión nueva en Releases, cree una etiqueta `vX.Y.Z` o ejecute el flujo manualmente con «Publicar».
+
+## Instalación en un servidor Linux con Docker
+
+### Equipo recomendado
+
+- Un mini PC con 8 a 16 GB de RAM y un disco SSD, conectado a un **UPS**.
+- Sistema operativo: Ubuntu Server 24.04 LTS.
+- Red local cableada hacia las cajas.
+- Un disco externo o una carpeta en otro equipo para copiar los respaldos.
+
+### Pasos
+
+1. Instale Docker en el servidor (siga la guía oficial de Docker Engine para Ubuntu).
+
+2. Copie el proyecto al servidor y entre en la carpeta `ferreteria/`.
+
+3. Cree el archivo de configuración:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Edite `.env` y cambie al menos `DB_CLAVE` y `JWT_SECRETO`. Para generar valores aleatorios:
+   ```bash
+   openssl rand -base64 48
+   ```
+
+5. Construya y levante el sistema:
+   ```bash
+   docker compose up -d --build
+   ```
+
+6. Abra `http://IP-DEL-SERVIDOR` desde cualquier equipo de la red. Si dejó `ADMIN_CLAVE_INICIAL` vacía, la clave temporal del usuario `admin` aparece en:
+   ```bash
+   docker compose logs api | grep "clave temporal"
+   ```
+
+7. Ingrese, **cambie la clave** (icono de llave, arriba a la derecha) y complete **Configuración**: razón social, RIF, alícuotas y redondeo.
+
+Si los equipos de la red no abren la página, revise el cortafuegos del servidor y permita el puerto 80, o el que haya indicado en `PUERTO_WEB`.
+
+### Primeros datos
+
+1. En **Tasa de cambio**, pulse «Consultar BCV» o cargue la tasa manualmente.
+2. En **Importar catálogo**, descargue la plantilla, llénela con sus productos, pulse «Revisar» y luego «Importar».
+3. Cree los usuarios en **Usuarios**, con un usuario por persona.
+
+### Actualizar a una nueva versión
+
+```bash
+git pull
+```
+
+```bash
+docker compose up -d --build
+```
+
+Las migraciones de base de datos se aplican solas al reiniciar la API. Antes de actualizar, conviene hacer un respaldo manual (ver abajo).
+
+## Respaldos
+
+- El servicio `respaldo` hace una copia al arrancar y otra diaria a la hora `RESPALDO_HORA`.
+- Las copias se guardan en `ferreteria/respaldos/` y se conservan `RESPALDO_DIAS` días.
+- **Copie esa carpeta a otro equipo o disco con regularidad.** Un respaldo en el mismo servidor no protege contra robo o daño del equipo.
+
+Para hacer un respaldo manual ahora:
+
+```bash
+docker compose restart respaldo
+```
+
+Para restaurar un respaldo (reemplaza **todos** los datos actuales):
+
+```bash
+./scripts/restaurar.sh respaldos/ferreteria-AAAAMMDD-HHMMSS.dump
+```
+
+## Tasa del BCV
+
+- La API consulta `https://www.bcv.org.ve/` cada 2 horas, de 8:00 a 20:00, hora de Venezuela.
+- Si la lectura difiere más de 50 % de la tasa vigente, se descarta por seguridad y queda registrada en el log.
+- Sin internet, el gerente puede cargar la tasa a mano en **Tasa de cambio**.
+- **Certificado del BCV.** El sitio del BCV a veces publica su certificado sin la cadena intermedia. La consulta falla entonces con `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. Para resolverlo:
+  1. Descargue el certificado intermedio de la autoridad que firmó el del BCV.
+  2. Guárdelo como `certificados/bcv.pem`.
+  3. Descomente `NODE_EXTRA_CA_CERTS=/certificados/bcv.pem` en `.env`.
+  4. Reinicie con `docker compose up -d`.
+
+  No se desactiva la verificación TLS.
+
+## Roles y permisos
+
+| Acción | Admin | Gerente | Almacén | Cajero |
+|---|:-:|:-:|:-:|:-:|
+| Consultar productos y precios | ✓ | ✓ | ✓ | ✓ |
+| Ver costos y márgenes | ✓ | ✓ | ✓ | — |
+| Crear y editar productos, categorías, marcas y proveedores | ✓ | ✓ | ✓ | — |
+| Modificar costos y precios, ajuste masivo, importación | ✓ | ✓ | — | — |
+| Cargar o consultar la tasa BCV | ✓ | ✓ | — | — |
+| Usuarios y configuración | ✓ | — | — | — |
+
+Tras 5 claves incorrectas, el usuario queda bloqueado 5 minutos.
+
+## Desarrollo
+
+Requisitos: Node 22 y PostgreSQL 16.
+
+```bash
+cd backend
+```
+
+```bash
+npm install
+```
+
+```bash
+DB_HOST=localhost DB_USUARIO=ferreteria DB_CLAVE=ferreteria DB_NOMBRE=ferreteria npm run start:dev
+```
+
+En otra terminal:
+
+```bash
+cd frontend
+```
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+El frontend queda en `http://localhost:5173` y reenvía `/api` a `http://localhost:3000`. La documentación interactiva de la API está en `http://localhost:3000/api/docs`.
+
+### Pruebas
+
+```bash
+cd backend
+```
+
+```bash
+npm test
+```
+
+Las pruebas de integración levantan la API completa contra una base PostgreSQL **que se borra**. Use una base dedicada:
+
+```bash
+DB_NOMBRE_PRUEBAS=ferreteria_test npm run test:e2e
+```
+
+### Cambios en la base de datos
+
+1. Modifique las entidades en `backend/src/**/*.entity.ts`.
+2. Genere la migración y revísela antes de confirmarla:
+   ```bash
+   npm run migracion:generar -- src/base-datos/migraciones/NombreDelCambio
+   ```
+
+## Próximas fases
+
+1. **Inventario:** kardex, existencias, ajustes, conteo físico y alertas de mínimos.
+2. **Punto de venta y caja:** pagos mixtos (Bs, USD, Pago Móvil, punto de venta, Zelle), vuelto y cierre de caja por moneda.
+3. **Módulo fiscal:** máquina fiscal o imprenta digital, IVA, IGTF y notas de crédito, según lo que defina el contador.
+4. **Compras, crédito a clientes, libros de compras y ventas, retenciones y reportes.**

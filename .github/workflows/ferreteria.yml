@@ -1,0 +1,62 @@
+name: Ferretería
+
+on:
+  push:
+    branches: [main]
+    paths: ['ferreteria/**', '.github/workflows/ferreteria.yml']
+  pull_request:
+    paths: ['ferreteria/**', '.github/workflows/ferreteria.yml']
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ferreteria/backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ferreteria
+          POSTGRES_PASSWORD: ferreteria
+          POSTGRES_DB: ferreteria_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ferreteria"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ferreteria/backend/package-lock.json
+      - run: npm ci
+      - run: npm run formato:verificar
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run test:e2e
+        env:
+          DB_HOST: localhost
+          DB_USUARIO: ferreteria
+          DB_CLAVE: ferreteria
+          DB_NOMBRE_PRUEBAS: ferreteria_test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ferreteria/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ferreteria/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run formato:verificar
+      - run: npm run build
