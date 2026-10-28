@@ -1,0 +1,95 @@
+import { ReactNode } from 'react';
+import { Navigate, Route, Routes } from 'react-router';
+import { Marco } from './componentes/Marco';
+import { Cargando } from './componentes/ui';
+import { useSesion } from './lib/sesion';
+import { Rol } from './lib/tipos';
+import { AjustePrecios } from './paginas/AjustePrecios';
+import { Catalogos } from './paginas/Catalogos';
+import { Configuracion } from './paginas/Configuracion';
+import { Importar } from './paginas/Importar';
+import { Inicio } from './paginas/Inicio';
+import { Login } from './paginas/Login';
+import { ProductoFormulario } from './paginas/ProductoFormulario';
+import { Productos } from './paginas/Productos';
+import { Proveedores } from './paginas/Proveedores';
+import { Tasas } from './paginas/Tasas';
+import { Usuarios } from './paginas/Usuarios';
+
+function Restringido({ roles, children }: { roles: Rol[]; children: ReactNode }) {
+  const { puede } = useSesion();
+  return puede(...roles) ? children : <Navigate to="/" replace />;
+}
+
+export function App() {
+  const { usuario, cargando } = useSesion();
+  if (cargando) return <Cargando texto="Iniciando…" />;
+  if (!usuario) return <Login />;
+  return (
+    <Routes>
+      <Route element={<Marco />}>
+        <Route index element={<Inicio />} />
+        <Route path="productos" element={<Productos />} />
+        <Route
+          path="productos/nuevo"
+          element={
+            <Restringido roles={['GERENTE', 'ALMACEN']}>
+              <ProductoFormulario />
+            </Restringido>
+          }
+        />
+        <Route path="productos/:id" element={<ProductoFormulario />} />
+        <Route
+          path="catalogos"
+          element={
+            <Restringido roles={['GERENTE', 'ALMACEN']}>
+              <Catalogos />
+            </Restringido>
+          }
+        />
+        <Route
+          path="proveedores"
+          element={
+            <Restringido roles={['GERENTE', 'ALMACEN']}>
+              <Proveedores />
+            </Restringido>
+          }
+        />
+        <Route path="tasas" element={<Tasas />} />
+        <Route
+          path="precios/ajuste"
+          element={
+            <Restringido roles={['GERENTE']}>
+              <AjustePrecios />
+            </Restringido>
+          }
+        />
+        <Route
+          path="importar"
+          element={
+            <Restringido roles={['GERENTE']}>
+              <Importar />
+            </Restringido>
+          }
+        />
+        <Route
+          path="usuarios"
+          element={
+            <Restringido roles={['ADMIN']}>
+              <Usuarios />
+            </Restringido>
+          }
+        />
+        <Route
+          path="configuracion"
+          element={
+            <Restringido roles={['ADMIN']}>
+              <Configuracion />
+            </Restringido>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  );
+}

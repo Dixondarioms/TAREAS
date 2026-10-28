@@ -1,0 +1,4 @@
+.env
+respaldos/
+certificados/*
+!certificados/.gitkeep

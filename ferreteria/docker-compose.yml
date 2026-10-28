@@ -1,0 +1,70 @@
+# Instalación local en el servidor de la ferretería.
+# Uso: copie .env.example a .env, ajuste las claves y ejecute:  docker compose up -d --build
+name: ferreteria
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ferreteria
+      POSTGRES_USER: ferreteria
+      POSTGRES_PASSWORD: ${DB_CLAVE:?Defina DB_CLAVE en .env}
+      TZ: America/Caracas
+    volumes:
+      - datos_bd:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ferreteria -d ferreteria"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_USUARIO: ferreteria
+      DB_NOMBRE: ferreteria
+      DB_CLAVE: ${DB_CLAVE}
+      JWT_SECRETO: ${JWT_SECRETO:?Defina JWT_SECRETO en .env}
+      JWT_DURACION: ${JWT_DURACION:-12h}
+      ADMIN_USUARIO: ${ADMIN_USUARIO:-admin}
+      ADMIN_CLAVE_INICIAL: ${ADMIN_CLAVE_INICIAL:-}
+      BCV_ACTUALIZACION_AUTOMATICA: ${BCV_ACTUALIZACION_AUTOMATICA:-true}
+      NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-}
+    volumes:
+      - ./certificados:/certificados:ro
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${PUERTO_WEB:-80}:80"
+
+  respaldo:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ferreteria
+      PGDATABASE: ferreteria
+      PGPASSWORD: ${DB_CLAVE}
+      RESPALDO_HORA: ${RESPALDO_HORA:-23}
+      RESPALDO_DIAS: ${RESPALDO_DIAS:-30}
+      TZ: America/Caracas
+    volumes:
+      - ./respaldos:/respaldos
+      - ./scripts/respaldo.sh:/respaldo.sh:ro
+    entrypoint: ["/bin/sh", "/respaldo.sh"]
+
+volumes:
+  datos_bd:
