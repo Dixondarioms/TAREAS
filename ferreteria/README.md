@@ -2,7 +2,7 @@
 
 Software de gestión de **La Casa del Inyector San Juan, C.A.**, ferretería pequeña o mediana en Venezuela, pensado para **instalarse en un servidor dentro de la tienda** y funcionar aunque falle internet.
 
-Esta versión incluye las **fases 1 y 2** del plan: catálogo, precios en dos monedas, tasa BCV e inventario.
+Esta versión incluye las **fases 1 a 3** del plan: catálogo, precios en dos monedas, tasa BCV, inventario, punto de venta, caja y facturación por talonario.
 
 | Módulo | Qué hace |
 |---|---|
@@ -16,6 +16,10 @@ Esta versión incluye las **fases 1 y 2** del plan: catálogo, precios en dos mo
 | Proveedores | Ficha con RIF validado (dígito verificador del SENIAT) y códigos y costos por producto. |
 | Búsqueda | Por palabras, sin importar acentos, por código o código de barras, y tolerante a errores de tipeo («tornilo»). |
 | Inventario | Existencia por producto y kardex de cada movimiento (nunca se modifica). Ajustes de entrada, salida y merma con motivo, conteo físico con lector de código de barras, alertas de productos bajo el mínimo o sin existencia y valor del inventario al costo. La existencia inicial se puede cargar desde Excel. |
+| Punto de venta | Venta con lector de código de barras, por unidad o presentación y con lista de precios. Factura en Bs a la tasa BCV, IVA por alícuota, pagos mixtos (efectivo Bs y USD, pago móvil, transferencia, punto de venta, Zelle, Binance) y vuelto en Bs o USD. Si la empresa es contribuyente especial suma el IGTF (3 %) sobre lo pagado en divisas. Descuenta el inventario. |
+| Facturación por talonario | Registro de los talonarios de la imprenta: el sistema asigna cada número de factura y de control en orden, sin saltos. Hojas dañadas se anulan con motivo. Resumen imprimible para copiar la factura. Sin talonario disponible no se puede vender. |
+| Caja | Apertura con fondo en Bs y USD, retiros, gastos e ingresos de efectivo, y cierre con arqueo por método de pago (esperado, contado y diferencia). Anulación de ventas mientras la caja sigue abierta. |
+| Clientes | Cédula o RIF validado, nombre o razón social y dirección fiscal; sin cliente la factura sale a «Consumidor final». |
 | Respaldos | Copia diaria automática de la base de datos y script de restauración. |
 
 ## Arquitectura
@@ -187,6 +191,9 @@ Para restaurar un respaldo (reemplaza **todos** los datos actuales):
 | Modificar costos y precios, ajuste masivo, importación | ✓ | ✓ | — | — |
 | Consultar existencias y kardex | ✓ | ✓ | ✓ | ✓ (sin costos) |
 | Ajustes de inventario y conteo físico | ✓ | ✓ | ✓ | — |
+| Vender, abrir y cerrar su caja, anular sus ventas (con la caja abierta) | ✓ | ✓ | — | ✓ |
+| Ver todas las ventas y el historial de cajas | ✓ | ✓ | — | — (solo las suyas) |
+| Registrar o retirar talonarios | ✓ | ✓ | — | — |
 | Cargar o consultar la tasa BCV | ✓ | ✓ | — | — |
 | Usuarios y configuración | ✓ | — | — | — |
 
@@ -250,6 +257,5 @@ DB_NOMBRE_PRUEBAS=ferreteria_test npm run test:e2e
 
 ## Próximas fases
 
-1. **Punto de venta y caja:** pagos mixtos (Bs, USD, Pago Móvil, punto de venta, Zelle), vuelto y cierre de caja por moneda.
-2. **Módulo fiscal:** máquina fiscal o imprenta digital, IVA, IGTF y notas de crédito, según lo que defina el contador.
-3. **Compras, crédito a clientes, libros de compras y ventas, retenciones y reportes.**
+1. **Módulo fiscal:** notas de crédito y débito, libros de ventas y de compras, retenciones de IVA y, si el negocio migra, imprenta digital; según lo que defina el contador.
+2. **Compras, crédito a clientes y reportes.**

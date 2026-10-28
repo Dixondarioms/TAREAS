@@ -12,6 +12,7 @@ import { SaludController } from './salud.controller';
 import { SemillasModule } from './semillas/semillas.module';
 import { TasasModule } from './tasas/tasas.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { VentasModule } from './ventas/ventas.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     CatalogoModule,
     ProveedoresModule,
     InventarioModule,
+    VentasModule,
     SemillasModule,
   ],
   controllers: [SaludController],
