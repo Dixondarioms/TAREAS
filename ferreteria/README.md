@@ -2,7 +2,7 @@
 
 Software de gestión de **La Casa del Inyector San Juan, C.A.**, ferretería pequeña o mediana en Venezuela, pensado para **instalarse en un servidor dentro de la tienda** y funcionar aunque falle internet.
 
-Esta versión corresponde a la **fase 1** del plan: catálogo, precios en dos monedas y tasa BCV.
+Esta versión incluye las **fases 1 y 2** del plan: catálogo, precios en dos monedas, tasa BCV e inventario.
 
 | Módulo | Qué hace |
 |---|---|
@@ -15,6 +15,7 @@ Esta versión corresponde a la **fase 1** del plan: catálogo, precios en dos mo
 | Importación | Carga o actualización del catálogo desde Excel (.xlsx) o CSV, con revisión previa y reporte de errores por fila. |
 | Proveedores | Ficha con RIF validado (dígito verificador del SENIAT) y códigos y costos por producto. |
 | Búsqueda | Por palabras, sin importar acentos, por código o código de barras, y tolerante a errores de tipeo («tornilo»). |
+| Inventario | Existencia por producto y kardex de cada movimiento (nunca se modifica). Ajustes de entrada, salida y merma con motivo, conteo físico con lector de código de barras, alertas de productos bajo el mínimo o sin existencia y valor del inventario al costo. La existencia inicial se puede cargar desde Excel. |
 | Respaldos | Copia diaria automática de la base de datos y script de restauración. |
 
 ## Arquitectura
@@ -184,6 +185,8 @@ Para restaurar un respaldo (reemplaza **todos** los datos actuales):
 | Ver costos y márgenes | ✓ | ✓ | ✓ | — |
 | Crear y editar productos, categorías, marcas y proveedores | ✓ | ✓ | ✓ | — |
 | Modificar costos y precios, ajuste masivo, importación | ✓ | ✓ | — | — |
+| Consultar existencias y kardex | ✓ | ✓ | ✓ | ✓ (sin costos) |
+| Ajustes de inventario y conteo físico | ✓ | ✓ | ✓ | — |
 | Cargar o consultar la tasa BCV | ✓ | ✓ | — | — |
 | Usuarios y configuración | ✓ | — | — | — |
 
@@ -247,7 +250,6 @@ DB_NOMBRE_PRUEBAS=ferreteria_test npm run test:e2e
 
 ## Próximas fases
 
-1. **Inventario:** kardex, existencias, ajustes, conteo físico y alertas de mínimos.
-2. **Punto de venta y caja:** pagos mixtos (Bs, USD, Pago Móvil, punto de venta, Zelle), vuelto y cierre de caja por moneda.
-3. **Módulo fiscal:** máquina fiscal o imprenta digital, IVA, IGTF y notas de crédito, según lo que defina el contador.
-4. **Compras, crédito a clientes, libros de compras y ventas, retenciones y reportes.**
+1. **Punto de venta y caja:** pagos mixtos (Bs, USD, Pago Móvil, punto de venta, Zelle), vuelto y cierre de caja por moneda.
+2. **Módulo fiscal:** máquina fiscal o imprenta digital, IVA, IGTF y notas de crédito, según lo que defina el contador.
+3. **Compras, crédito a clientes, libros de compras y ventas, retenciones y reportes.**

@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import {
+  Boxes,
   DollarSign,
   FolderTree,
   House,
@@ -35,6 +36,7 @@ interface Enlace {
 const ENLACES: Enlace[] = [
   { a: '/', texto: 'Inicio', icono: <House className="size-4" /> },
   { a: '/productos', texto: 'Productos', icono: <Package className="size-4" /> },
+  { a: '/inventario', texto: 'Inventario', icono: <Boxes className="size-4" /> },
   { a: '/catalogos', texto: 'Categorías y marcas', icono: <FolderTree className="size-4" />, roles: ['GERENTE', 'ALMACEN'] },
   { a: '/proveedores', texto: 'Proveedores', icono: <Truck className="size-4" />, roles: ['GERENTE', 'ALMACEN'] },
   { a: '/tasas', texto: 'Tasa de cambio', icono: <DollarSign className="size-4" /> },

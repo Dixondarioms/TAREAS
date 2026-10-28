@@ -8,6 +8,7 @@ import { Presentacion } from '../catalogo/entidades/presentacion.entity';
 import { Producto } from '../catalogo/entidades/producto.entity';
 import { UnidadMedida } from '../catalogo/entidades/unidad-medida.entity';
 import { Parametro } from '../configuracion/parametro.entity';
+import { MovimientoInventario } from '../inventario/movimiento-inventario.entity';
 import { ProductoProveedor } from '../proveedores/producto-proveedor.entity';
 import { Proveedor } from '../proveedores/proveedor.entity';
 import { TasaCambio } from '../tasas/tasa-cambio.entity';
@@ -28,4 +29,5 @@ export const ENTIDADES = [
   HistorialCosto,
   Proveedor,
   ProductoProveedor,
+  MovimientoInventario,
 ];

@@ -65,6 +65,10 @@ export class Producto {
   @Column({ type: 'enum', enum: AlicuotaIva, enumName: 'alicuota_iva', default: AlicuotaIva.GENERAL })
   alicuotaIva: AlicuotaIva;
 
+  /** Existencia en unidad base. Solo cambia con movimientos de inventario (kardex). */
+  @Column({ type: 'numeric', precision: 18, scale: 3, default: 0 })
+  existencia: string;
+
   @Column({ type: 'numeric', precision: 18, scale: 3, default: 0 })
   stockMinimo: string;
 

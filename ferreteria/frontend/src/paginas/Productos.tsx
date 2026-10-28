@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Plus, Search } from 'lucide-react';
 import { KeyboardEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { Existencia } from '../componentes/inventario';
 import { Aviso, Boton, Cargando, Encabezado, Insignia, Paginador, Selector, Tabla, Tarjeta, td, th } from '../componentes/ui';
 import { api } from '../lib/api';
 import { useCategorias, useListas, useMarcas } from '../lib/consultas';
@@ -157,6 +158,9 @@ export function Productos() {
                           {p.marca && ` · ${p.marca}`}
                           {p.ubicacion && ` · ${p.ubicacion}`}
                         </div>
+                        <div className="mt-1">
+                          <Existencia existencia={p.existencia} minimo={p.stockMinimo} unidad={p.unidad} />
+                        </div>
                       </div>
                       <div className="shrink-0 text-right">
                         <div className="cifra font-semibold text-slate-900">{bs(p.precio?.precioBsConIva)}</div>
@@ -177,6 +181,7 @@ export function Productos() {
                       <th className={th}>Descripción</th>
                       <th className={th}>Unidad</th>
                       <th className={th}>IVA</th>
+                      <th className={`${th} text-right`}>Existencia</th>
                       {verCostos && <th className={`${th} text-right`}>Costo</th>}
                       <th className={`${th} text-right`}>Precio $ (con IVA)</th>
                       <th className={`${th} text-right`}>Precio Bs (con IVA)</th>
@@ -202,6 +207,9 @@ export function Productos() {
                         <td className={td}>
                           <Insignia color={p.alicuotaIva === 'EXENTO' ? 'azul' : 'gris'}>{NOMBRE_IVA[p.alicuotaIva]}</Insignia>
                         </td>
+                        <td className={`${td} text-right whitespace-nowrap`}>
+                          <Existencia existencia={p.existencia} minimo={p.stockMinimo} />
+                        </td>
                         {verCostos && <td className={`${td} cifra text-right text-slate-500`}>{usd(p.costoUsd)}</td>}
                         <td className={`${td} cifra text-right`}>{usd(p.precio?.precioUsdConIva)}</td>
                         <td className={`${td} cifra text-right font-semibold text-slate-900`}>{bs(p.precio?.precioBsConIva)}</td>
@@ -209,7 +217,7 @@ export function Productos() {
                     ))}
                     {datos?.datos.length === 0 && (
                       <tr>
-                        <td colSpan={7} className={`${td} py-8 text-center text-slate-500`}>
+                        <td colSpan={8} className={`${td} py-8 text-center text-slate-500`}>
                           No se encontraron productos.
                         </td>
                       </tr>

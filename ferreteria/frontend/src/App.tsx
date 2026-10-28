@@ -7,8 +7,10 @@ import { Rol } from './lib/tipos';
 import { AjustePrecios } from './paginas/AjustePrecios';
 import { Catalogos } from './paginas/Catalogos';
 import { Configuracion } from './paginas/Configuracion';
+import { ConteoFisico } from './paginas/ConteoFisico';
 import { Importar } from './paginas/Importar';
 import { Inicio } from './paginas/Inicio';
+import { Inventario } from './paginas/Inventario';
 import { Login } from './paginas/Login';
 import { ProductoFormulario } from './paginas/ProductoFormulario';
 import { Productos } from './paginas/Productos';
@@ -39,6 +41,15 @@ export function App() {
           }
         />
         <Route path="productos/:id" element={<ProductoFormulario />} />
+        <Route path="inventario" element={<Inventario />} />
+        <Route
+          path="inventario/conteo"
+          element={
+            <Restringido roles={['GERENTE', 'ALMACEN']}>
+              <ConteoFisico />
+            </Restringido>
+          }
+        />
         <Route
           path="catalogos"
           element={

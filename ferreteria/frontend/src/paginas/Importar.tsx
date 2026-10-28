@@ -142,6 +142,10 @@ export function Importar() {
                   <code>stock_minimo</code>, <code>ubicacion</code>, <code>proveedor_rif</code>, <code>codigo_proveedor</code>.
                 </li>
                 <li>
+                  Existencia inicial: <code>existencia</code> (cantidad contada). Si difiere de la del sistema, la diferencia
+                  queda como ajuste de conteo en el kardex del producto.
+                </li>
+                <li>
                   Precios por lista: <code>margen_publico</code> o <code>precio_publico</code> (y igual para las demás listas).
                 </li>
                 <li>Los números pueden escribirse como 1.234,56 o 1234.56.</li>
