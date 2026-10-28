@@ -52,7 +52,7 @@ foreach ($v in $VersionesPostgres) {
     Write-Host "PostgreSQL $v"
     break
   } catch {
-    Write-Host "PostgreSQL $v no disponible: $($_.Exception.Message)"
+    Write-Host "PostgreSQL $v no disponible"
     Remove-Item "$candidato.parcial" -ErrorAction SilentlyContinue
   }
 }
@@ -76,8 +76,20 @@ foreach ($ext in @('unaccent.control', 'pg_trgm.control')) {
 
 # ---- WinSW (envoltorio de servicios de Windows)
 New-Item -ItemType Directory -Path (Join-Path $dist 'servicio') | Out-Null
-Descargar "https://github.com/winsw/winsw/releases/download/v$VersionWinSW/WinSW-net461.exe" (Join-Path $cache "WinSW-$VersionWinSW.exe")
-Copy-Item (Join-Path $cache "WinSW-$VersionWinSW.exe") (Join-Path $dist 'servicio\winsw.exe')
+$winsw = Join-Path $cache "WinSW-$VersionWinSW.exe"
+# El nombre del archivo publicado cambió entre versiones de WinSW: se prueban los conocidos.
+foreach ($nombre in @('WinSW.NET461.exe', 'WinSW-net461.exe', 'WinSW-x64.exe')) {
+  try {
+    Descargar "https://github.com/winsw/winsw/releases/download/v$VersionWinSW/$nombre" $winsw
+    Write-Host "WinSW $VersionWinSW ($nombre)"
+    break
+  } catch {
+    Write-Host "WinSW: $nombre no disponible"
+    Remove-Item "$winsw.parcial" -ErrorAction SilentlyContinue
+  }
+}
+if (-not (Test-Path $winsw)) { throw 'No se pudo descargar WinSW' }
+Copy-Item $winsw (Join-Path $dist 'servicio\winsw.exe')
 
 # ---- Aplicación
 $backend = Join-Path $raiz 'backend'
