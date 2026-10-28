@@ -165,13 +165,14 @@ Para restaurar un respaldo (reemplaza **todos** los datos actuales):
 - La API consulta `https://www.bcv.org.ve/` cada 2 horas, de 8:00 a 20:00, hora de Venezuela.
 - Si la lectura difiere más de 50 % de la tasa vigente, se descarta por seguridad y queda registrada en el log.
 - Sin internet, el gerente puede cargar la tasa a mano en **Tasa de cambio**.
-- **Certificado del BCV.** El sitio del BCV a veces publica su certificado sin la cadena intermedia. La consulta falla entonces con `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. Para resolverlo:
+- Si la consulta falla, el log de la API indica el motivo, por ejemplo «no se encontró el servidor (¿hay internet?) (ENOTFOUND)».
+- **Certificado del BCV.** El sitio del BCV a veces envía su certificado sin la cadena intermedia (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`). La API lo resuelve sola, igual que los navegadores: descarga el certificado intermedio desde la dirección «CA Issuers» del propio certificado. Solo lo acepta si es el que firmó el certificado del BCV, y la cadena completa debe llegar a una autoridad raíz de confianza. No se desactiva la verificación TLS.
+
+  Si en algún momento esa descarga tampoco funciona (por ejemplo, porque la red bloquea `crt.sectigo.com`), puede darle el intermedio a mano:
   1. Descargue el certificado intermedio de la autoridad que firmó el del BCV.
   2. Guárdelo como `certificados/bcv.pem`.
   3. Descomente `NODE_EXTRA_CA_CERTS=/certificados/bcv.pem` en `.env`.
   4. Reinicie con `docker compose up -d`.
-
-  No se desactiva la verificación TLS.
 
 ## Roles y permisos
 
