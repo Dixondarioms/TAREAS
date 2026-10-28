@@ -43,6 +43,11 @@ export const PARAMETROS_POR_DEFECTO: ParametrosSistema = {
 
 type Clave = keyof ParametrosSistema;
 
+/** Solo los campos enviados: los que llegan como undefined no deben borrar el valor guardado. */
+function definidos<T extends object>(cambios: T): Partial<T> {
+  return Object.fromEntries(Object.entries(cambios).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
 @Injectable()
 export class ConfiguracionService {
   private cache: ParametrosSistema | null = null;
@@ -71,9 +76,12 @@ export class ConfiguracionService {
   async actualizar(cambios: Partial<ParametrosSistema>): Promise<ParametrosSistema> {
     const actuales = await this.obtenerTodo();
     const nuevos: Partial<ParametrosSistema> = {};
-    if (cambios.empresa) nuevos.empresa = this.validarEmpresa({ ...actuales.empresa, ...cambios.empresa });
-    if (cambios.redondeoBs) nuevos.redondeoBs = this.validarRedondeo({ ...actuales.redondeoBs, ...cambios.redondeoBs });
-    if (cambios.alicuotasIva) nuevos.alicuotasIva = this.validarAlicuotas({ ...actuales.alicuotasIva, ...cambios.alicuotasIva });
+    if (cambios.empresa) nuevos.empresa = this.validarEmpresa({ ...actuales.empresa, ...definidos(cambios.empresa) });
+    if (cambios.redondeoBs)
+      nuevos.redondeoBs = this.validarRedondeo({ ...actuales.redondeoBs, ...definidos(cambios.redondeoBs) });
+    if (cambios.alicuotasIva) {
+      nuevos.alicuotasIva = this.validarAlicuotas({ ...actuales.alicuotasIva, ...definidos(cambios.alicuotasIva) });
+    }
 
     for (const [clave, valor] of Object.entries(nuevos)) {
       await this.repo.save({ clave, valor });
