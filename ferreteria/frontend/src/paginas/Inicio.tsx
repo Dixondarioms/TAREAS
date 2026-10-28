@@ -5,6 +5,7 @@ import { TarjetaTasas } from '../componentes/TarjetaTasas';
 import { Encabezado, Tarjeta } from '../componentes/ui';
 import { api } from '../lib/api';
 import { useConfiguracion } from '../lib/consultas';
+import { RAZON_SOCIAL } from '../lib/marca';
 import { useSesion } from '../lib/sesion';
 import { ResultadoBusqueda } from '../lib/tipos';
 
@@ -18,7 +19,7 @@ export function Inicio() {
 
   return (
     <>
-      <Encabezado titulo={`Hola, ${usuario?.nombre ?? ''}`} descripcion={config.data?.empresa.razonSocial} />
+      <Encabezado titulo={`Hola, ${usuario?.nombre ?? ''}`} descripcion={config.data?.empresa.razonSocial || RAZON_SOCIAL} />
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <TarjetaTasas />

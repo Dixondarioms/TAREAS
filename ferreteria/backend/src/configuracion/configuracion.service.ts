@@ -30,7 +30,13 @@ export interface ParametrosSistema {
 }
 
 export const PARAMETROS_POR_DEFECTO: ParametrosSistema = {
-  empresa: { razonSocial: 'Mi Ferretería, C.A.', rif: '', direccion: '', telefono: '', contribuyenteEspecial: false },
+  empresa: {
+    razonSocial: 'La Casa del Inyector San Juan, C.A.',
+    rif: '',
+    direccion: '',
+    telefono: '',
+    contribuyenteEspecial: false,
+  },
   redondeoBs: { multiplo: '0.01', modo: 'CERCANO' },
   alicuotasIva: { GENERAL: '16', REDUCIDA: '8', EXENTO: '0' },
 };

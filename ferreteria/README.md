@@ -1,6 +1,6 @@
-# Sistema de gestión para ferretería
+# La Casa del Inyector San Juan, C.A. — Sistema de gestión
 
-Software de gestión para una ferretería pequeña o mediana en Venezuela, pensado para **instalarse en un servidor dentro de la tienda** y funcionar aunque falle internet.
+Software de gestión de **La Casa del Inyector San Juan, C.A.**, ferretería pequeña o mediana en Venezuela, pensado para **instalarse en un servidor dentro de la tienda** y funcionar aunque falle internet.
 
 Esta versión corresponde a la **fase 1** del plan: catálogo, precios en dos monedas y tasa BCV.
 

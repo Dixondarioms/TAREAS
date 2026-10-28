@@ -13,7 +13,7 @@ export function configurarApp(app: INestApplication): void {
   );
   const documento = SwaggerModule.createDocument(
     app,
-    new DocumentBuilder().setTitle('API Ferretería').setVersion('0.1.0').addBearerAuth().build(),
+    new DocumentBuilder().setTitle('API La Casa del Inyector').setVersion('0.1.0').addBearerAuth().build(),
   );
   SwaggerModule.setup('api/docs', app, documento);
 }

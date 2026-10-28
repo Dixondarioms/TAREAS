@@ -12,7 +12,6 @@ import {
   Truck,
   Upload,
   Users,
-  Wrench,
   X,
 } from 'lucide-react';
 import { FormEvent, ReactNode, useState } from 'react';
@@ -20,6 +19,7 @@ import { NavLink, Outlet } from 'react-router';
 import { api } from '../lib/api';
 import { useEstadoTasas } from '../lib/consultas';
 import { NOMBRE_ROL, numero } from '../lib/formato';
+import { NOMBRE_COMERCIAL } from '../lib/marca';
 import { useSesion } from '../lib/sesion';
 import { Rol } from '../lib/tipos';
 import { useAvisos } from './avisos';
@@ -61,7 +61,7 @@ export function Marco() {
           onClick={() => setMenuAbierto(false)}
           className={({ isActive }) =>
             `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              isActive ? 'bg-marca-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              isActive ? 'bg-marca-600 text-white' : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'
             }`
           }
         >
@@ -76,16 +76,16 @@ export function Marco() {
     <div className="min-h-screen lg:pl-60">
       {/* Barra lateral */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-60 transform bg-slate-900 transition lg:translate-x-0 ${menuAbierto ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-30 w-60 transform bg-fondo-marca transition lg:translate-x-0 ${menuAbierto ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <div className="flex h-14 items-center justify-between gap-2 border-b border-slate-800 px-4">
-          <div className="flex items-center gap-2 font-semibold text-white">
-            <span className="grid size-8 place-items-center rounded-lg bg-marca-600">
-              <Wrench className="size-4" />
-            </span>
-            Ferretería
-          </div>
-          <button className="text-slate-400 lg:hidden" onClick={() => setMenuAbierto(false)} aria-label="Cerrar menú">
+        <div className="relative border-b border-neutral-800 px-3 py-3">
+          <img src="/logo-texto.jpg" alt={NOMBRE_COMERCIAL} className="mx-auto h-auto w-full max-w-52" />
+          <div className="mt-1.5 h-0.5 rounded bg-acento/70" />
+          <button
+            className="absolute top-2 right-2 text-neutral-400 lg:hidden"
+            onClick={() => setMenuAbierto(false)}
+            aria-label="Cerrar menú"
+          >
             <X className="size-5" />
           </button>
         </div>
