@@ -42,9 +42,11 @@ Esta versión corresponde a la **fase 1** del plan: catálogo, precios en dos mo
 
 Es la forma más sencilla: un solo archivo instala todo. Incluye la base de datos PostgreSQL, la aplicación, los respaldos diarios y el acceso desde la red. No necesita Docker ni internet para funcionar.
 
-1. Descargue `Instalador-LaCasaDelInyector-X.Y.Z.exe` desde la página **Releases** del repositorio.
+1. Descargue `Instalador-LaCasaDelInyector-X.Y.Z.exe` desde la página **Releases** del repositorio. Junto a él está `SHA256SUMS.txt`, para comprobar que el archivo llegó completo y sin cambios (ver [Verificar el instalador](#verificar-el-instalador)).
 2. Ejecútelo en la computadora que será el servidor de la tienda (Windows 10 u 11 de 64 bits). Pedirá permiso de administrador.
-   - Si aparece «Windows protegió su PC», pulse **Más información** y luego **Ejecutar de todas formas**. Ocurre porque el instalador no está firmado digitalmente.
+   - Las versiones firmadas digitalmente (lo indica la página de la versión) muestran en la ventana de permiso de administrador **Editor comprobado: FDP Software**. Si dice «Editor: Desconocido», **no lo ejecute** y descárguelo otra vez desde Releases.
+   - En las primeras semanas con un certificado nuevo, Windows todavía puede mostrar «Windows protegió su PC» mientras el instalador gana reputación. Pulse **Más información** y continúe con **Ejecutar de todas formas** solo si allí aparece «Editor: FDP Software».
+   - Las versiones anteriores a la firma, y las que la página de la versión indique «sin firmar», muestran siempre ese aviso con «Editor: Desconocido»; en ese caso compruebe el SHA-256 antes de ejecutarlo.
 3. Al terminar, el asistente muestra:
    - la dirección para entrar desde las demás computadoras, por ejemplo `http://192.168.1.50/`;
    - el usuario `admin` y su **clave inicial**. Anótela y cámbiela al entrar.
@@ -62,7 +64,26 @@ Es la forma más sencilla: un solo archivo instala todo. Incluye la base de dato
 - **Desinstalar:** desde «Agregar o quitar programas». Los datos se conservan, y si vuelve a instalar se recuperan.
 - Mantenga ese equipo encendido mientras la tienda trabaje. Configure Windows para que **no entre en suspensión**.
 
-El instalador se compila y se prueba automáticamente en un Windows real con GitHub Actions (`.github/workflows/instalador-windows.yml`). Para publicar una versión nueva en Releases, cree una etiqueta `vX.Y.Z` o ejecute el flujo manualmente con «Publicar».
+El instalador se compila y se prueba automáticamente en un Windows real con GitHub Actions (`.github/workflows/instalador-windows.yml`). Para publicar una versión nueva en Releases, cree una etiqueta `vX.Y.Z` o ejecute el flujo manualmente con «Publicar». La firma digital se hace en ese mismo flujo; qué certificado hace falta y cómo configurarlo está en [`instalador-windows/FIRMA.md`](instalador-windows/FIRMA.md).
+
+### Verificar el instalador
+
+**Firma digital.** Clic derecho sobre el `.exe` → **Propiedades** → pestaña **Firmas digitales**: debe aparecer *FDP Software* y, en **Detalles**, «Esta firma digital es correcta». O en PowerShell:
+
+```powershell
+Get-AuthenticodeSignature .\Instalador-LaCasaDelInyector-X.Y.Z.exe | Format-List Status, SignerCertificate, TimeStamperCertificate
+```
+
+`Status` debe ser `Valid` y el firmante debe ser `FDP Software` (en `SignerCertificate`, campo `CN=` u `O=`). Si la pestaña no existe o el estado es otro, el archivo no está firmado o fue modificado: no lo ejecute.
+
+**Suma SHA-256.** Compare la suma del archivo descargado con la línea correspondiente de `SHA256SUMS.txt` de la misma versión:
+
+```powershell
+(Get-FileHash .\Instalador-LaCasaDelInyector-X.Y.Z.exe -Algorithm SHA256).Hash
+Get-Content .\SHA256SUMS.txt
+```
+
+Las dos sumas deben ser iguales (sin importar mayúsculas y minúsculas).
 
 ## Instalación en un servidor Linux con Docker
 

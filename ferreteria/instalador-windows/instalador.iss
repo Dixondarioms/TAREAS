@@ -2,17 +2,27 @@
 ; Se compila con Inno Setup 6 (ver preparar.ps1 y .github/workflows/instalador-windows.yml):
 ;   ISCC.exe /DVersionApp=0.1.0 instalador.iss
 ; Espera los archivos de la aplicación en dist\app (los arma preparar.ps1).
+; Firma digital (opcional, ver FIRMA.md): se activa con /DFirmar y una herramienta de firma llamada «firma», por ejemplo
+;   ISCC.exe /DFirmar "/Sfirma=powershell.exe -NoProfile -ExecutionPolicy Bypass -File $qC:\ruta\firmar.ps1$q $f" instalador.iss
+; Sin /DFirmar se compila sin firmar, como en los PR y en las pruebas locales.
 
 #ifndef VersionApp
   #define VersionApp "0.0.0"
 #endif
+; Editor del programa: debe ser el mismo nombre que figura en el certificado de firma.
+#define Editor "FDP Software"
 
 [Setup]
 AppId={{6F1C3A52-8E4B-4C1E-9B7A-2D4C5E6F7A81}
 AppName=La Casa del Inyector - Sistema de gestión
 AppVersion={#VersionApp}
 AppVerName=La Casa del Inyector {#VersionApp}
-AppPublisher=La Casa del Inyector San Juan, C.A.
+AppPublisher={#Editor}
+VersionInfoCompany={#Editor}
+VersionInfoCopyright=Copyright (C) {#Editor}
+VersionInfoDescription=Instalador de La Casa del Inyector - Sistema de gestión
+VersionInfoProductName=La Casa del Inyector - Sistema de gestión
+VersionInfoProductTextVersion={#VersionApp}
 DefaultDirName={autopf}\LaCasaDelInyector
 DisableDirPage=yes
 DefaultGroupName=La Casa del Inyector
@@ -33,6 +43,14 @@ PrivilegesRequired=admin
 MinVersion=10.0
 CloseApplications=no
 RestartApplications=no
+#ifdef Firmar
+; Se firman el instalador y el desinstalador (unins000.exe). El servicio de firma o el sello de tiempo
+; a veces fallan por un momento: se reintenta antes de dar la compilación por fallida.
+SignTool=firma
+SignedUninstaller=yes
+SignToolRetryCount=3
+SignToolRetryDelay=5000
+#endif
 
 [Languages]
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"

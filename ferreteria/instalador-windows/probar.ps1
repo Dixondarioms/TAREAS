@@ -1,6 +1,7 @@
 ﻿# Prueba completa del instalador en un Windows limpio (se usa en GitHub Actions):
 # instalación silenciosa, uso de la API, respaldo, actualización conservando datos y desinstalación.
-param([Parameter(Mandatory = $true)][string]$Instalador)
+# Con -ExigirFirma comprueba además que el instalador, el desinstalador y WinSW estén firmados (ver FIRMA.md).
+param([Parameter(Mandatory = $true)][string]$Instalador, [switch]$ExigirFirma)
 $ErrorActionPreference = 'Stop'
 
 $datos = Join-Path $env:ProgramData 'LaCasaDelInyector'
@@ -50,6 +51,12 @@ try {
   Afirmar ($null -ne (Get-NetFirewallRule -Name 'LCI-Web' -ErrorAction SilentlyContinue)) 'regla de firewall creada'
   Afirmar ($null -ne (Get-ScheduledTask -TaskName 'LCI - Respaldo diario' -ErrorAction SilentlyContinue)) 'tarea de respaldo creada'
   Afirmar (Test-Path "$app\abrir.url") 'acceso directo creado'
+  if ($ExigirFirma) {
+    foreach ($exe in @($Instalador, "$app\unins000.exe", "$app\servicio\winsw.exe")) {
+      $firma = Get-AuthenticodeSignature $exe
+      Afirmar ($firma.Status -eq 'Valid' -and $firma.TimeStamperCertificate) "$(Split-Path $exe -Leaf) firmado con sello de tiempo ($($firma.SignerCertificate.Subject))"
+    }
+  }
 
   Paso 'La aplicación responde'
   $pagina = Invoke-WebRequest -Uri $script:url -UseBasicParsing
