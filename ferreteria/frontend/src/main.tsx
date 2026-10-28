@@ -2,6 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
+// Fuentes incluidas en la aplicación: funcionan sin internet en la red de la tienda.
+import '@fontsource-variable/inter/wght.css';
+import '@fontsource-variable/jetbrains-mono/wght.css';
 import { App } from './App';
 import { ProveedorAvisos } from './componentes/avisos';
 import './index.css';
