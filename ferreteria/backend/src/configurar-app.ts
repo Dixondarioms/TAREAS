@@ -1,9 +1,11 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { servirAplicacionWeb } from './servir-web';
 
 /** Configuración común a la aplicación real y a las pruebas de integración. */
 export function configurarApp(app: INestApplication): void {
   app.setGlobalPrefix('api');
+  if (process.env.FRONTEND_DIR) servirAplicacionWeb(app, process.env.FRONTEND_DIR);
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

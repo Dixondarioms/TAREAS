@@ -38,7 +38,33 @@ Esta versión corresponde a la **fase 1** del plan: catálogo, precios en dos mo
 - **Tasa por fecha valor.** Rige la tasa con la fecha valor más reciente que no sea posterior a hoy. Las tasas nunca se modifican: una corrección es un registro nuevo.
 - **Esquema por migraciones.** La base de datos se actualiza sola al iniciar la API, con migraciones revisadas y versionadas.
 
-## Instalación en el servidor de la tienda
+## Instalación en Windows con el instalador (.exe)
+
+Es la forma más sencilla: un solo archivo instala todo. Incluye la base de datos PostgreSQL, la aplicación, los respaldos diarios y el acceso desde la red. No necesita Docker ni internet para funcionar.
+
+1. Descargue `Instalador-LaCasaDelInyector-X.Y.Z.exe` desde la página **Releases** del repositorio.
+2. Ejecútelo en la computadora que será el servidor de la tienda (Windows 10 u 11 de 64 bits). Pedirá permiso de administrador.
+   - Si aparece «Windows protegió su PC», pulse **Más información** y luego **Ejecutar de todas formas**. Ocurre porque el instalador no está firmado digitalmente.
+3. Al terminar, el asistente muestra:
+   - la dirección para entrar desde las demás computadoras, por ejemplo `http://192.168.1.50/`;
+   - el usuario `admin` y su **clave inicial**. Anótela y cámbiela al entrar.
+4. En el escritorio queda el acceso directo **La Casa del Inyector**.
+
+| Qué | Dónde |
+|---|---|
+| Programa | `C:\Program Files\LaCasaDelInyector` |
+| Datos, respaldos y registros | `C:\ProgramData\LaCasaDelInyector` |
+| Servicios de Windows | `LCI-BaseDatos` y `LCI-API`, con inicio automático |
+| Respaldo diario | Tarea programada a las 23:00. Si el equipo estaba apagado, se hace al encenderlo. |
+
+- En el menú Inicio, bajo **La Casa del Inyector**, están la carpeta de respaldos, **Restaurar un respaldo** y los registros de diagnóstico.
+- **Actualizar:** ejecute el `.exe` de la nueva versión. Antes de actualizar se hace un respaldo automático y los datos se conservan.
+- **Desinstalar:** desde «Agregar o quitar programas». Los datos se conservan, y si vuelve a instalar se recuperan.
+- Mantenga ese equipo encendido mientras la tienda trabaje. Configure Windows para que **no entre en suspensión**.
+
+El instalador se compila y se prueba automáticamente en un Windows real con GitHub Actions (`.github/workflows/instalador-windows.yml`). Para publicar una versión nueva en Releases, cree una etiqueta `vX.Y.Z` o ejecute el flujo manualmente con «Publicar».
+
+## Instalación en un servidor Linux con Docker
 
 ### Equipo recomendado
 
