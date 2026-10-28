@@ -72,6 +72,8 @@ Name: "{commondesktop}\La Casa del Inyector"; Filename: "{app}\abrir.url"; IconF
 Name: "{group}\La Casa del Inyector"; Filename: "{app}\abrir.url"; IconFilename: "{app}\logo.ico"
 Name: "{group}\Carpeta de respaldos"; Filename: "{commonappdata}\LaCasaDelInyector\respaldos"
 Name: "{group}\Restaurar un respaldo"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\scripts\restaurar.ps1"""; IconFilename: "{app}\logo.ico"
+Name: "{group}\Copia de respaldos fuera del equipo"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\scripts\copia-respaldos.ps1"""; IconFilename: "{app}\logo.ico"
+Name: "{group}\Restablecer clave del administrador"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\scripts\restablecer-clave.ps1"""; IconFilename: "{app}\logo.ico"
 Name: "{group}\Registros (diagnóstico)"; Filename: "{commonappdata}\LaCasaDelInyector\logs"
 Name: "{group}\Desinstalar La Casa del Inyector"; Filename: "{uninstallexe}"
 

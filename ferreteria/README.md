@@ -59,7 +59,9 @@ Es la forma más sencilla: un solo archivo instala todo. Incluye la base de dato
 | Servicios de Windows | `LCI-BaseDatos` y `LCI-API`, con inicio automático |
 | Respaldo diario | Tarea programada a las 23:00. Si el equipo estaba apagado, se hace al encenderlo. |
 
-- En el menú Inicio, bajo **La Casa del Inyector**, están la carpeta de respaldos, **Restaurar un respaldo** y los registros de diagnóstico.
+- En el menú Inicio, bajo **La Casa del Inyector**, están la carpeta de respaldos, **Restaurar un respaldo** y los registros de diagnóstico, además de:
+  - **Copia de respaldos fuera del equipo:** elija un disco externo, un pendrive o una carpeta de OneDrive o Google Drive. Cada respaldo se copia también allí, y se conservan los mismos días que en el servidor. Si el disco no está conectado a la hora del respaldo, solo se omite la copia de ese día y queda un aviso en `respaldos.log`.
+  - **Restablecer clave del administrador:** si se pierde la clave del usuario `admin`, genera una nueva y la muestra en pantalla. Pide permiso de administrador de Windows.
 - **Actualizar:** ejecute el `.exe` de la nueva versión. Antes de actualizar se hace un respaldo automático y los datos se conservan.
 - **Desinstalar:** desde «Agregar o quitar programas». Los datos se conservan, y si vuelve a instalar se recuperan.
 - Mantenga ese equipo encendido mientras la tienda trabaje. Configure Windows para que **no entre en suspensión**.

@@ -7,7 +7,7 @@ import { Rol } from './rol.enum';
 import { Usuario } from './usuario.entity';
 import { ActualizarUsuarioDto, CrearUsuarioDto } from './usuarios.dto';
 
-const COSTO_BCRYPT = 11;
+export const COSTO_BCRYPT = 11;
 
 @Injectable()
 export class UsuariosService {
