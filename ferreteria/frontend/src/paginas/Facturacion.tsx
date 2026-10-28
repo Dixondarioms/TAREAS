@@ -2,14 +2,36 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { useAvisos } from '../componentes/avisos';
-import { AreaTexto, Aviso, Boton, Campo, Cargando, Encabezado, Insignia, Modal, Tabla, Tarjeta, td, th } from '../componentes/ui';
+import {
+  AreaTexto,
+  Aviso,
+  Boton,
+  Campo,
+  Cargando,
+  Encabezado,
+  Insignia,
+  Modal,
+  Selector,
+  Tabla,
+  Tarjeta,
+  td,
+  th,
+} from '../componentes/ui';
 import { api } from '../lib/api';
 import { fecha } from '../lib/formato';
 import { useSesion } from '../lib/sesion';
-import { EstadoFacturacion, FacturaAnulada, Talonario } from '../lib/ventas';
+import { EstadoFacturacion, FacturaAnulada, Talonario, TipoDocumento } from '../lib/ventas';
 
 const rellenar = (n: number, digitos: number) => String(n).padStart(digitos, '0');
-const VACIO = { serie: '', numeroDesde: '', numeroHasta: '', controlPrefijo: '00-', controlDesde: '', digitos: '6' };
+const VACIO = {
+  tipo: 'FACTURA' as TipoDocumento,
+  serie: '',
+  numeroDesde: '',
+  numeroHasta: '',
+  controlPrefijo: '00-',
+  controlDesde: '',
+  digitos: '6',
+};
 
 export function Facturacion() {
   const { puede } = useSesion();
@@ -24,6 +46,10 @@ export function Facturacion() {
     queryKey: ['talonarios', 'estado'],
     queryFn: () => api.get<EstadoFacturacion>('/talonarios/estado'),
   });
+  const estadoNotas = useQuery({
+    queryKey: ['talonarios', 'estado', 'NOTA_CREDITO'],
+    queryFn: () => api.get<EstadoFacturacion>('/talonarios/estado', { tipo: 'NOTA_CREDITO' }),
+  });
   const talonarios = useQuery({ queryKey: ['talonarios', 'lista'], queryFn: () => api.get<Talonario[]>('/talonarios') });
   const anuladas = useQuery({
     queryKey: ['talonarios', 'anuladas'],
@@ -35,6 +61,7 @@ export function Facturacion() {
   const crear = useMutation({
     mutationFn: () =>
       api.post('/talonarios', {
+        tipo: form.tipo,
         serie: form.serie || undefined,
         numeroDesde: Number(form.numeroDesde),
         numeroHasta: Number(form.numeroHasta),
@@ -113,6 +140,18 @@ export function Facturacion() {
           ) : (
             <Aviso tipo="error">No hay facturas disponibles. Registre un talonario para poder vender.</Aviso>
           )}
+          <div className="mt-4 border-t border-slate-100 pt-3 text-sm">
+            <div className="font-medium text-slate-700">Próxima nota de crédito</div>
+            {estadoNotas.data?.proxima ? (
+              <div className="cifra text-slate-600">
+                N° {estadoNotas.data.proxima.serie ? `${estadoNotas.data.proxima.serie}-` : ''}
+                {estadoNotas.data.proxima.numero} · control {estadoNotas.data.proxima.numeroControl} · quedan{' '}
+                {estadoNotas.data.restantes}
+              </div>
+            ) : (
+              <div className="text-slate-500">Sin talonario de notas de crédito: regístrelo para poder hacer devoluciones.</div>
+            )}
+          </div>
         </Tarjeta>
 
         <Tarjeta titulo="Talonarios" className="lg:col-span-2">
@@ -122,6 +161,7 @@ export function Facturacion() {
             <Tabla>
               <thead>
                 <tr>
+                  <th className={th}>Tipo</th>
                   <th className={th}>Serie</th>
                   <th className={th}>Números</th>
                   <th className={th}>Control desde</th>
@@ -133,6 +173,7 @@ export function Facturacion() {
               <tbody className="divide-y divide-slate-100">
                 {talonarios.data?.map((t) => (
                   <tr key={t.id}>
+                    <td className={td}>{t.tipo === 'NOTA_CREDITO' ? 'Nota de crédito' : 'Factura'}</td>
                     <td className={td}>{t.serie || '—'}</td>
                     <td className={`${td} cifra`}>
                       {rellenar(t.numeroDesde, t.digitos)} – {rellenar(t.numeroHasta, t.digitos)}
@@ -171,7 +212,7 @@ export function Facturacion() {
                 ))}
                 {talonarios.data?.length === 0 && (
                   <tr>
-                    <td colSpan={6} className={`${td} py-8 text-center text-slate-500`}>
+                    <td colSpan={7} className={`${td} py-8 text-center text-slate-500`}>
                       Todavía no hay talonarios registrados.
                     </td>
                   </tr>
@@ -212,7 +253,15 @@ export function Facturacion() {
             crear.mutate();
           }}
         >
-          <p className="text-sm text-slate-600">Copie los datos impresos en la primera y la última factura del talonario.</p>
+          <p className="text-sm text-slate-600">Copie los datos impresos en la primera y la última hoja del talonario.</p>
+          <Selector
+            etiqueta="Tipo de documento"
+            value={form.tipo}
+            onChange={(e) => setForm({ ...form, tipo: e.target.value as TipoDocumento })}
+          >
+            <option value="FACTURA">Facturas</option>
+            <option value="NOTA_CREDITO">Notas de crédito</option>
+          </Selector>
           <div className="grid gap-3 sm:grid-cols-2">
             <Campo etiqueta="Desde el N°" inputMode="numeric" required {...campo('numeroDesde')} autoFocus />
             <Campo etiqueta="Hasta el N°" inputMode="numeric" required {...campo('numeroHasta')} />

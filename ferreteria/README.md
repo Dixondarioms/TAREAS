@@ -2,7 +2,7 @@
 
 Software de gestión de **La Casa del Inyector San Juan, C.A.**, ferretería pequeña o mediana en Venezuela, pensado para **instalarse en un servidor dentro de la tienda** y funcionar aunque falle internet.
 
-Esta versión incluye las **fases 1 a 3** del plan: catálogo, precios en dos monedas, tasa BCV, inventario, punto de venta, caja y facturación por talonario.
+Esta versión incluye las **fases 1 a 4** del plan: catálogo, precios en dos monedas, tasa BCV, inventario, punto de venta, caja, facturación por talonario, notas de crédito y libros fiscales.
 
 | Módulo | Qué hace |
 |---|---|
@@ -19,6 +19,8 @@ Esta versión incluye las **fases 1 a 3** del plan: catálogo, precios en dos mo
 | Punto de venta | Venta con lector de código de barras, por unidad o presentación y con lista de precios. Factura en Bs a la tasa BCV, IVA por alícuota, pagos mixtos (efectivo Bs y USD, pago móvil, transferencia, punto de venta, Zelle, Binance) y vuelto en Bs o USD. Si la empresa es contribuyente especial suma el IGTF (3 %) sobre lo pagado en divisas. Descuenta el inventario. |
 | Facturación por talonario | Registro de los talonarios de la imprenta: el sistema asigna cada número de factura y de control en orden, sin saltos. Hojas dañadas se anulan con motivo. Resumen imprimible para copiar la factura. Sin talonario disponible no se puede vender. |
 | Caja | Apertura con fondo en Bs y USD, retiros, gastos e ingresos de efectivo, y cierre con arqueo por método de pago (esperado, contado y diferencia). Anulación de ventas mientras la caja sigue abierta. |
+| Notas de crédito | Devolución total o parcial de una factura, con su propio talonario y correlativo. Se calcula con la tasa y el IVA de la factura original, el reintegro sale de la caja abierta (efectivo Bs o USD, o pago móvil) y la mercancía vuelve al inventario salvo que llegue dañada. |
+| Libros fiscales | Libro de ventas (facturas, notas de crédito en negativo, facturas y hojas anuladas) y libro de compras del mes, con exportación a Excel, y resumen de débito y crédito fiscal para la declaración de IVA. Las facturas de proveedores se registran con sus montos en Bs y se valida que el IVA corresponda a la base. |
 | Clientes | Cédula o RIF validado, nombre o razón social y dirección fiscal; sin cliente la factura sale a «Consumidor final». |
 | Respaldos | Copia diaria automática de la base de datos y script de restauración. |
 
@@ -193,7 +195,9 @@ Para restaurar un respaldo (reemplaza **todos** los datos actuales):
 | Ajustes de inventario y conteo físico | ✓ | ✓ | ✓ | — |
 | Vender, abrir y cerrar su caja, anular sus ventas (con la caja abierta) | ✓ | ✓ | — | ✓ |
 | Ver todas las ventas y el historial de cajas | ✓ | ✓ | — | — (solo las suyas) |
+| Notas de crédito de sus ventas (reintegro desde su caja) | ✓ | ✓ | — | ✓ |
 | Registrar o retirar talonarios | ✓ | ✓ | — | — |
+| Libros fiscales y facturas de compra | ✓ | ✓ | — | — |
 | Cargar o consultar la tasa BCV | ✓ | ✓ | — | — |
 | Usuarios y configuración | ✓ | — | — | — |
 
@@ -257,5 +261,6 @@ DB_NOMBRE_PRUEBAS=ferreteria_test npm run test:e2e
 
 ## Próximas fases
 
-1. **Módulo fiscal:** notas de crédito y débito, libros de ventas y de compras, retenciones de IVA y, si el negocio migra, imprenta digital; según lo que defina el contador.
-2. **Compras, crédito a clientes y reportes.**
+1. **Compras:** órdenes de compra y recepción de mercancía que actualice existencias y costos y genere la factura del libro de compras; cuentas por pagar.
+2. **Crédito a clientes y reportes:** cuentas por cobrar, comprobantes de retención de IVA, notas de débito, ventas y ganancias por período.
+3. **Imprenta digital**, si el negocio migra a ese esquema según lo que defina el contador.

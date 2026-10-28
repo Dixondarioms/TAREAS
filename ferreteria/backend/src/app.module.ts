@@ -6,6 +6,7 @@ import { opcionesBaseDatos } from './base-datos/opciones';
 import { CatalogoModule } from './catalogo/catalogo.module';
 import { leerConfiguracion } from './configuracion-app';
 import { ConfiguracionModule } from './configuracion/configuracion.module';
+import { FiscalModule } from './fiscal/fiscal.module';
 import { InventarioModule } from './inventario/inventario.module';
 import { ProveedoresModule } from './proveedores/proveedores.module';
 import { SaludController } from './salud.controller';
@@ -26,6 +27,7 @@ import { VentasModule } from './ventas/ventas.module';
     ProveedoresModule,
     InventarioModule,
     VentasModule,
+    FiscalModule,
     SemillasModule,
   ],
   controllers: [SaludController],

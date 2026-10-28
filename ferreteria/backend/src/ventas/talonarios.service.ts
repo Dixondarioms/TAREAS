@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { UsuarioSesion } from '../comun/decoradores';
 import { FacturaAnulada } from './entidades/factura-anulada.entity';
-import { Talonario } from './entidades/talonario.entity';
+import { Talonario, TipoDocumento } from './entidades/talonario.entity';
 import { AnularNumeroDto, CrearTalonarioDto } from './ventas.dto';
 
 /** Se avisa cuando quedan estas facturas o menos en los talonarios activos. */
@@ -48,8 +48,8 @@ export class TalonariosService {
     return talonarios.map((t) => ({ ...t, restantes: Math.max(0, t.numeroHasta - t.siguiente + 1) }));
   }
 
-  async estado(): Promise<EstadoFacturacion> {
-    const disponibles = await this.disponibles(this.ds.manager, false);
+  async estado(tipo: TipoDocumento = TipoDocumento.FACTURA): Promise<EstadoFacturacion> {
+    const disponibles = await this.disponibles(this.ds.manager, tipo, false);
     const restantes = disponibles.reduce((s, t) => s + t.numeroHasta - t.siguiente + 1, 0);
     const t = disponibles[0];
     return {
@@ -71,10 +71,12 @@ export class TalonariosService {
     if (dto.numeroHasta - dto.numeroDesde >= 100_000)
       throw new BadRequestException('Un talonario no puede tener más de 100.000 facturas');
     const serie = (dto.serie ?? '').trim().toUpperCase();
+    const tipo = dto.tipo ?? TipoDocumento.FACTURA;
     const solapado = await this.ds
       .getRepository(Talonario)
       .createQueryBuilder('t')
-      .where('t.serie = :serie AND t.numero_desde <= :hasta AND t.numero_hasta >= :desde', {
+      .where('t.tipo = :tipo AND t.serie = :serie AND t.numero_desde <= :hasta AND t.numero_hasta >= :desde', {
+        tipo,
         serie,
         desde: dto.numeroDesde,
         hasta: dto.numeroHasta,
@@ -86,6 +88,7 @@ export class TalonariosService {
       );
     }
     return this.ds.getRepository(Talonario).save({
+      tipo,
       serie,
       numeroDesde: dto.numeroDesde,
       numeroHasta: dto.numeroHasta,
@@ -108,11 +111,11 @@ export class TalonariosService {
   }
 
   /** Talonarios activos con números libres, del más antiguo al más nuevo. */
-  private disponibles(m: EntityManager, bloquear: boolean): Promise<Talonario[]> {
+  private disponibles(m: EntityManager, tipo: TipoDocumento, bloquear: boolean): Promise<Talonario[]> {
     const q = m
       .getRepository(Talonario)
       .createQueryBuilder('t')
-      .where('t.activo AND t.siguiente <= t.numero_hasta')
+      .where('t.activo AND t.siguiente <= t.numero_hasta AND t.tipo = :tipo', { tipo })
       .orderBy('t.id', 'ASC');
     if (bloquear) q.setLock('pessimistic_write');
     return q.getMany();
@@ -122,10 +125,14 @@ export class TalonariosService {
    * Toma el siguiente número del talonario en uso, dentro de la transacción
    * de la venta. El bloqueo evita que dos cajas usen el mismo número.
    */
-  async asignar(m: EntityManager): Promise<NumeroAsignado> {
-    const [t] = await this.disponibles(m, true);
+  async asignar(m: EntityManager, tipo: TipoDocumento = TipoDocumento.FACTURA): Promise<NumeroAsignado> {
+    const [t] = await this.disponibles(m, tipo, true);
     if (!t) {
-      throw new BadRequestException('No hay facturas disponibles: registre un talonario nuevo en Facturación antes de vender');
+      throw new BadRequestException(
+        tipo === TipoDocumento.FACTURA
+          ? 'No hay facturas disponibles: registre un talonario nuevo en Facturación antes de vender'
+          : 'No hay notas de crédito disponibles: registre un talonario de notas de crédito en Facturación',
+      );
     }
     const numero = t.siguiente;
     await m.update(Talonario, { id: t.id }, { siguiente: numero + 1 });
@@ -135,7 +142,7 @@ export class TalonariosService {
   /** Anula la próxima hoja del talonario (se dañó o se llenó mal): su número queda usado. */
   anularSiguiente(dto: AnularNumeroDto, usuario: UsuarioSesion): Promise<FacturaAnulada> {
     return this.ds.transaction(async (m) => {
-      const { talonario, numero, numeroControl } = await this.asignar(m);
+      const { talonario, numero, numeroControl } = await this.asignar(m, dto.tipo ?? TipoDocumento.FACTURA);
       return m.save(
         m.create(FacturaAnulada, {
           talonarioId: talonario.id,

@@ -1,6 +1,11 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Usuario } from '../../usuarios/usuario.entity';
 
+export enum TipoDocumento {
+  FACTURA = 'FACTURA',
+  NOTA_CREDITO = 'NOTA_CREDITO',
+}
+
 /**
  * Talonario de facturas impreso por la imprenta autorizada. Cada factura
  * trae un número de factura y un número de control consecutivos; el sistema
@@ -10,6 +15,10 @@ import { Usuario } from '../../usuarios/usuario.entity';
 export class Talonario {
   @PrimaryGeneratedColumn({ primaryKeyConstraintName: 'PK_talonarios' })
   id: number;
+
+  /** La imprenta imprime talonarios distintos para facturas y para notas de crédito. */
+  @Column({ type: 'enum', enum: TipoDocumento, enumName: 'tipo_documento', default: TipoDocumento.FACTURA })
+  tipo: TipoDocumento;
 
   /** Serie impresa (puede estar vacía). */
   @Column({ length: 10, default: '' })

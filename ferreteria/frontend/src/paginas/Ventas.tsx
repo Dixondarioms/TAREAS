@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAvisos } from '../componentes/avisos';
 import { ResumenFactura } from '../componentes/factura';
+import { cantidad } from '../componentes/inventario';
 import {
   AreaTexto,
   Aviso,
   Boton,
   Cargando,
+  Casilla,
   Campo,
   Encabezado,
   Insignia,
@@ -21,10 +23,10 @@ import {
   th,
 } from '../componentes/ui';
 import { api } from '../lib/api';
-import { bs, fecha } from '../lib/formato';
+import { aDecimalApi, bs, fecha, numero } from '../lib/formato';
 import { useSesion } from '../lib/sesion';
 import { Pagina } from '../lib/tipos';
-import { numeroFactura, Venta } from '../lib/ventas';
+import { MetodoPago, METODOS, NotaCredito, numeroFactura, numeroNota, simboloMoneda, Venta } from '../lib/ventas';
 
 export function Ventas() {
   const { puede } = useSesion();
@@ -145,10 +147,16 @@ function DetalleVenta({ id, alCerrar }: { id: number | null; alCerrar: () => voi
   const avisos = useAvisos();
   const consultas = useQueryClient();
   const [anulando, setAnulando] = useState(false);
+  const [devolviendo, setDevolviendo] = useState(false);
   const [motivo, setMotivo] = useState('');
   const venta = useQuery({
     queryKey: ['ventas', 'detalle', id],
     queryFn: () => api.get<Venta>(`/ventas/${id}`),
+    enabled: id !== null,
+  });
+  const notas = useQuery({
+    queryKey: ['ventas', 'notas', id],
+    queryFn: () => api.get<NotaCredito[]>(`/ventas/${id}/notas-credito`),
     enabled: id !== null,
   });
   const anular = useMutation({
@@ -166,6 +174,7 @@ function DetalleVenta({ id, alCerrar }: { id: number | null; alCerrar: () => voi
   });
   const cerrar = () => {
     setAnulando(false);
+    setDevolviendo(false);
     alCerrar();
   };
   const v = venta.data;
@@ -176,7 +185,10 @@ function DetalleVenta({ id, alCerrar }: { id: number | null; alCerrar: () => voi
       ) : (
         <div className="space-y-4">
           <ResumenFactura venta={v} />
-          {anulando ? (
+          {notas.data && notas.data.length > 0 && <ListaNotas notas={notas.data} />}
+          {devolviendo ? (
+            <FormNotaCredito venta={v} notas={notas.data ?? []} alTerminar={() => setDevolviendo(false)} />
+          ) : anulando ? (
             <form
               className="space-y-3 rounded-lg bg-red-50 p-3 ring-1 ring-red-200"
               onSubmit={(e) => {
@@ -209,9 +221,14 @@ function DetalleVenta({ id, alCerrar }: { id: number | null; alCerrar: () => voi
           ) : (
             <div className="flex justify-end gap-2 border-t border-slate-100 pt-3 print:hidden">
               {v.estado === 'COMPLETADA' && (
-                <Boton variante="secundario" onClick={() => setAnulando(true)}>
-                  Anular
-                </Boton>
+                <>
+                  <Boton variante="secundario" onClick={() => setDevolviendo(true)}>
+                    Nota de crédito
+                  </Boton>
+                  <Boton variante="secundario" onClick={() => setAnulando(true)}>
+                    Anular
+                  </Boton>
+                </>
               )}
               <Boton variante="secundario" icono={<Printer className="size-4" />} onClick={() => window.print()}>
                 Imprimir
@@ -221,5 +238,165 @@ function DetalleVenta({ id, alCerrar }: { id: number | null; alCerrar: () => voi
         </div>
       )}
     </Modal>
+  );
+}
+
+function ListaNotas({ notas }: { notas: NotaCredito[] }) {
+  return (
+    <div className="space-y-2 border-t border-slate-200 pt-3">
+      <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">Notas de crédito</div>
+      {notas.map((n) => (
+        <div key={n.id} className="rounded-lg bg-amber-50/60 p-3 text-sm ring-1 ring-amber-200">
+          <div className="flex flex-wrap justify-between gap-2">
+            <span className="font-medium text-slate-900">
+              N° <span className="cifra">{numeroNota(n)}</span> · control <span className="cifra">{n.numeroControl}</span>
+            </span>
+            <span className="cifra font-semibold text-slate-900">− {bs(n.totalBs)}</span>
+          </div>
+          <div className="text-xs text-slate-600">
+            {fecha(n.creadoEn)} · {n.motivo}
+            {n.usuario && ` · ${n.usuario.nombre}`} · reintegro {simboloMoneda(n.reintegroMetodo)} {numero(n.reintegroMonto, 2)} (
+            {METODOS[n.reintegroMetodo].nombre}){!n.devolverInventario && ' · mercancía no repuesta'}
+          </div>
+          <ul className="mt-1 text-xs text-slate-600">
+            {n.lineas.map((l) => (
+              <li key={l.id}>
+                {cantidad(l.cantidad)} {l.unidad} · {l.descripcion} · {bs(l.subtotalBs)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const METODOS_REINTEGRO: MetodoPago[] = ['EFECTIVO_BS', 'EFECTIVO_USD', 'PAGO_MOVIL'];
+
+function FormNotaCredito({ venta, notas, alTerminar }: { venta: Venta; notas: NotaCredito[]; alTerminar: () => void }) {
+  const avisos = useAvisos();
+  const consultas = useQueryClient();
+  const [cantidades, setCantidades] = useState<Record<number, string>>({});
+  const [motivo, setMotivo] = useState('');
+  const [devolverInventario, setDevolverInventario] = useState(true);
+  const [reintegroMetodo, setReintegroMetodo] = useState<MetodoPago>('EFECTIVO_BS');
+
+  const devuelto = (lineaId: number) =>
+    notas
+      .flatMap((n) => n.lineas)
+      .filter((l) => l.ventaLineaId === lineaId)
+      .reduce((s, l) => s + Number(l.cantidad), 0);
+  const lineas = (venta.lineas ?? []).map((l) => ({ ...l, restante: Number(l.cantidad) - devuelto(l.id) }));
+  const elegidas = lineas
+    .map((l) => ({ l, cantidad: Number(aDecimalApi(cantidades[l.id] || '0')) }))
+    .filter((x) => x.cantidad > 0);
+
+  // Vista previa con las mismas reglas de la API (2 decimales por renglón, IVA sobre la base).
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const bases = { EXENTO: 0, GENERAL: 0, REDUCIDA: 0 };
+  for (const { l, cantidad: c } of elegidas) bases[l.alicuotaIva] += r2(Number(l.precioBs) * c);
+  const total =
+    bases.EXENTO +
+    bases.GENERAL +
+    r2((bases.GENERAL * Number(venta.porcentajeGeneral)) / 100) +
+    bases.REDUCIDA +
+    r2((bases.REDUCIDA * Number(venta.porcentajeReducida)) / 100);
+  const enUsd = METODOS[reintegroMetodo].moneda === 'USD';
+
+  const crear = useMutation({
+    mutationFn: () =>
+      api.post<NotaCredito>(`/ventas/${venta.id}/notas-credito`, {
+        lineas: elegidas.map(({ l, cantidad: c }) => ({ ventaLineaId: l.id, cantidad: String(c) })),
+        motivo,
+        devolverInventario,
+        reintegroMetodo,
+      }),
+    onSuccess: (n) => {
+      avisos.exito(`Nota de crédito N° ${numeroNota(n)} registrada. Llénela en el talonario de notas de crédito.`);
+      void consultas.invalidateQueries({ queryKey: ['ventas'] });
+      void consultas.invalidateQueries({ queryKey: ['caja'] });
+      void consultas.invalidateQueries({ queryKey: ['productos'] });
+      void consultas.invalidateQueries({ queryKey: ['inventario'] });
+      void consultas.invalidateQueries({ queryKey: ['talonarios'] });
+      alTerminar();
+    },
+    onError: avisos.error,
+  });
+
+  return (
+    <form
+      className="space-y-3 rounded-lg bg-amber-50 p-3 ring-1 ring-amber-200 print:hidden"
+      onSubmit={(e) => {
+        e.preventDefault();
+        crear.mutate();
+      }}
+    >
+      <p className="text-sm text-slate-700">
+        Indique lo que el cliente devuelve. El monto se calcula con la tasa y el IVA de la factura, y el dinero sale de su caja.
+      </p>
+      <Tabla>
+        <thead>
+          <tr>
+            <th className={th}>Producto</th>
+            <th className={`${th} text-right`}>Puede devolver</th>
+            <th className={`${th} w-28`}>Devuelve</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-amber-100">
+          {lineas.map((l) => (
+            <tr key={l.id}>
+              <td className={td}>{l.descripcion}</td>
+              <td className={`${td} cifra text-right`}>
+                {cantidad(String(l.restante))} {l.unidad}
+              </td>
+              <td className={td}>
+                <input
+                  inputMode="decimal"
+                  disabled={l.restante <= 0}
+                  value={cantidades[l.id] ?? ''}
+                  placeholder="0"
+                  onChange={(e) => setCantidades({ ...cantidades, [l.id]: e.target.value })}
+                  aria-label={`Cantidad a devolver de ${l.codigo}`}
+                  className="cifra block w-full rounded-lg border-0 px-2 py-1.5 text-right text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-marca-500 disabled:bg-slate-100"
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </Tabla>
+      <AreaTexto etiqueta="Motivo" required minLength={3} rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+      <div className="grid gap-3 sm:grid-cols-2 sm:items-end">
+        <Selector
+          etiqueta="Reintegrar en"
+          value={reintegroMetodo}
+          onChange={(e) => setReintegroMetodo(e.target.value as MetodoPago)}
+        >
+          {METODOS_REINTEGRO.map((m) => (
+            <option key={m} value={m}>
+              {METODOS[m].nombre}
+            </option>
+          ))}
+        </Selector>
+        <Casilla
+          etiqueta="La mercancía vuelve al inventario"
+          checked={devolverInventario}
+          onChange={(e) => setDevolverInventario(e.target.checked)}
+        />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-amber-200 pt-3">
+        <div className="cifra text-sm">
+          Total: <strong>{bs(total.toFixed(2))}</strong>
+          {enUsd && <span className="text-slate-600"> · $ {numero((total / Number(venta.tasa)).toFixed(2), 2)}</span>}
+        </div>
+        <div className="flex gap-2">
+          <Boton variante="fantasma" onClick={alTerminar}>
+            Volver
+          </Boton>
+          <Boton type="submit" disabled={!elegidas.length} cargando={crear.isPending}>
+            Registrar nota de crédito
+          </Boton>
+        </div>
+      </div>
+    </form>
   );
 }

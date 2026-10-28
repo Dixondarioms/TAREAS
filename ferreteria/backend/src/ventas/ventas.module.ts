@@ -4,6 +4,7 @@ import { InventarioModule } from '../inventario/inventario.module';
 import { TasasModule } from '../tasas/tasas.module';
 import { CajaService } from './caja.service';
 import { ClientesService } from './clientes.service';
+import { NotasCreditoService } from './notas-credito.service';
 import { Cliente } from './entidades/cliente.entity';
 import { TalonariosService } from './talonarios.service';
 import { CajaController, ClientesController, TalonariosController, VentasController } from './ventas.controller';
@@ -12,6 +13,6 @@ import { VentasService } from './ventas.service';
 @Module({
   imports: [TypeOrmModule.forFeature([Cliente]), TasasModule, InventarioModule],
   controllers: [ClientesController, TalonariosController, CajaController, VentasController],
-  providers: [ClientesService, TalonariosService, CajaService, VentasService],
+  providers: [ClientesService, TalonariosService, CajaService, VentasService, NotasCreditoService],
 })
 export class VentasModule {}

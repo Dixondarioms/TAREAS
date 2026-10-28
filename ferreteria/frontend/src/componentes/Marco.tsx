@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import {
+  BookOpen,
   Boxes,
   FileText,
   DollarSign,
@@ -43,6 +44,7 @@ const ENLACES: Enlace[] = [
   { a: '/caja', texto: 'Caja', icono: <Wallet className="size-4" />, roles: ['GERENTE', 'CAJERO'] },
   { a: '/ventas', texto: 'Ventas', icono: <Receipt className="size-4" />, roles: ['GERENTE', 'CAJERO'] },
   { a: '/facturacion', texto: 'Facturación', icono: <FileText className="size-4" />, roles: ['GERENTE', 'CAJERO'] },
+  { a: '/libros', texto: 'Libros fiscales', icono: <BookOpen className="size-4" />, roles: ['GERENTE'] },
   { a: '/productos', texto: 'Productos', icono: <Package className="size-4" /> },
   { a: '/inventario', texto: 'Inventario', icono: <Boxes className="size-4" /> },
   { a: '/catalogos', texto: 'Categorías y marcas', icono: <FolderTree className="size-4" />, roles: ['GERENTE', 'ALMACEN'] },

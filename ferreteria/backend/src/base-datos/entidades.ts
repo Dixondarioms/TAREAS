@@ -8,6 +8,7 @@ import { Presentacion } from '../catalogo/entidades/presentacion.entity';
 import { Producto } from '../catalogo/entidades/producto.entity';
 import { UnidadMedida } from '../catalogo/entidades/unidad-medida.entity';
 import { Parametro } from '../configuracion/parametro.entity';
+import { FacturaCompra } from '../fiscal/factura-compra.entity';
 import { MovimientoInventario } from '../inventario/movimiento-inventario.entity';
 import { ProductoProveedor } from '../proveedores/producto-proveedor.entity';
 import { Proveedor } from '../proveedores/proveedor.entity';
@@ -16,6 +17,7 @@ import { Usuario } from '../usuarios/usuario.entity';
 import { Cliente } from '../ventas/entidades/cliente.entity';
 import { FacturaAnulada } from '../ventas/entidades/factura-anulada.entity';
 import { MovimientoCaja } from '../ventas/entidades/movimiento-caja.entity';
+import { NotaCredito, NotaCreditoLinea } from '../ventas/entidades/nota-credito.entity';
 import { SesionCaja } from '../ventas/entidades/sesion-caja.entity';
 import { Talonario } from '../ventas/entidades/talonario.entity';
 import { Venta, VentaLinea, VentaPago } from '../ventas/entidades/venta.entity';
@@ -44,4 +46,7 @@ export const ENTIDADES = [
   Venta,
   VentaLinea,
   VentaPago,
+  NotaCredito,
+  NotaCreditoLinea,
+  FacturaCompra,
 ];

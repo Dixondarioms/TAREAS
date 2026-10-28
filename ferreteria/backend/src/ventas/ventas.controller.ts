@@ -3,7 +3,9 @@ import { ApiTags } from '@nestjs/swagger';
 import { Roles, UsuarioActual, UsuarioSesion } from '../comun/decoradores';
 import { Rol } from '../usuarios/rol.enum';
 import { CajaService } from './caja.service';
+import { TipoDocumento } from './entidades/talonario.entity';
 import { ClientesService } from './clientes.service';
+import { NotasCreditoService } from './notas-credito.service';
 import { TalonariosService } from './talonarios.service';
 import {
   AbrirCajaDto,
@@ -16,6 +18,7 @@ import {
   CerrarCajaDto,
   CotizarVentaDto,
   CrearClienteDto,
+  CrearNotaCreditoDto,
   CrearTalonarioDto,
   CrearVentaDto,
   MovimientoCajaDto,
@@ -60,10 +63,10 @@ export class TalonariosController {
     return this.servicio.listar();
   }
 
-  /** Próxima factura y cuántas quedan. */
+  /** Próxima factura (o nota de crédito con ?tipo=NOTA_CREDITO) y cuántas quedan. */
   @Get('estado')
-  estado() {
-    return this.servicio.estado();
+  estado(@Query('tipo') tipo?: string) {
+    return this.servicio.estado(tipo === TipoDocumento.NOTA_CREDITO ? TipoDocumento.NOTA_CREDITO : TipoDocumento.FACTURA);
   }
 
   @Post()
@@ -136,7 +139,10 @@ export class CajaController {
 @Controller('ventas')
 @Roles(Rol.GERENTE, Rol.CAJERO)
 export class VentasController {
-  constructor(private readonly servicio: VentasService) {}
+  constructor(
+    private readonly servicio: VentasService,
+    private readonly notas: NotasCreditoService,
+  ) {}
 
   /** Calcula totales, IGTF y vuelto sin guardar nada. */
   @Post('cotizar')
@@ -164,5 +170,17 @@ export class VentasController {
   @HttpCode(200)
   anular(@Param('id', ParseIntPipe) id: number, @Body() dto: AnularVentaDto, @UsuarioActual() u: UsuarioSesion) {
     return this.servicio.anular(id, dto, u);
+  }
+
+  /** Devolución total o parcial: nota de crédito con reintegro desde la caja abierta. */
+  @Post(':id/notas-credito')
+  notaCredito(@Param('id', ParseIntPipe) id: number, @Body() dto: CrearNotaCreditoDto, @UsuarioActual() u: UsuarioSesion) {
+    return this.notas.crear(id, dto, u);
+  }
+
+  @Get(':id/notas-credito')
+  async notasDeVenta(@Param('id', ParseIntPipe) id: number, @UsuarioActual() u: UsuarioSesion) {
+    await this.servicio.detalle(id, u); // valida que pueda ver la venta
+    return this.notas.deVenta(id);
   }
 }

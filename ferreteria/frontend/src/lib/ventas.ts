@@ -26,8 +26,11 @@ export interface Cliente {
   telefono: string | null;
 }
 
+export type TipoDocumento = 'FACTURA' | 'NOTA_CREDITO';
+
 export interface Talonario {
   id: number;
+  tipo: TipoDocumento;
   serie: string;
   numeroDesde: number;
   numeroHasta: number;
@@ -146,6 +149,7 @@ export interface ResumenCaja {
   ventas: { cantidad: number; anuladas: number; totalBs: string; igtfBs: string };
   cobrado: MontosPorMetodo;
   vuelto: MontosPorMetodo;
+  reintegros: MontosPorMetodo;
   movimientos: {
     id: number;
     tipo: 'RETIRO' | 'GASTO' | 'INGRESO';
@@ -156,6 +160,41 @@ export interface ResumenCaja {
   }[];
   esperado: MontosPorMetodo;
   diferencias: MontosPorMetodo | null;
+}
+
+export interface NotaCredito {
+  id: number;
+  serie: string;
+  numero: number;
+  numeroControl: string;
+  talonario?: { digitos: number };
+  motivo: string;
+  devolverInventario: boolean;
+  baseExentaBs: string;
+  baseGeneralBs: string;
+  ivaGeneralBs: string;
+  baseReducidaBs: string;
+  ivaReducidaBs: string;
+  totalBs: string;
+  reintegroMetodo: MetodoPago;
+  reintegroMonto: string;
+  creadoEn: string;
+  usuario?: { nombre: string };
+  lineas: {
+    id: number;
+    ventaLineaId: number;
+    codigo: string;
+    descripcion: string;
+    unidad: string;
+    cantidad: string;
+    subtotalBs: string;
+  }[];
+}
+
+/** Número de nota de crédito con ceros a la izquierda y serie. */
+export function numeroNota(n: Pick<NotaCredito, 'serie' | 'numero'> & { talonario?: { digitos: number } }): string {
+  const s = String(n.numero).padStart(n.talonario?.digitos ?? 6, '0');
+  return n.serie ? `${n.serie}-${s}` : s;
 }
 
 /** Número de factura con ceros a la izquierda y serie: «A-000123». */

@@ -13,6 +13,7 @@ import { ConteoFisico } from './paginas/ConteoFisico';
 import { Importar } from './paginas/Importar';
 import { Inicio } from './paginas/Inicio';
 import { Inventario } from './paginas/Inventario';
+import { LibrosFiscales } from './paginas/LibrosFiscales';
 import { Login } from './paginas/Login';
 import { ProductoFormulario } from './paginas/ProductoFormulario';
 import { PuntoDeVenta } from './paginas/PuntoDeVenta';
@@ -64,6 +65,14 @@ export function App() {
           element={
             <Restringido roles={['GERENTE', 'CAJERO']}>
               <Facturacion />
+            </Restringido>
+          }
+        />
+        <Route
+          path="libros"
+          element={
+            <Restringido roles={['GERENTE']}>
+              <LibrosFiscales />
             </Restringido>
           }
         />

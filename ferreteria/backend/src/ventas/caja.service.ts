@@ -16,6 +16,8 @@ export interface ResumenCaja {
   /** Cobrado por método (sin restar vuelto), en la moneda del método. */
   cobrado: MontosPorMetodo;
   vuelto: MontosPorMetodo;
+  /** Devuelto a clientes por notas de crédito, en la moneda del método. */
+  reintegros: MontosPorMetodo;
   movimientos: MovimientoCaja[];
   /** Lo que debería haber por método: fondo + cobrado − vuelto ± movimientos. */
   esperado: MontosPorMetodo;
@@ -75,7 +77,7 @@ export class CajaService {
         const { esperado } = await this.resumen(m, sesion);
         if (dec(esperado[dto.metodo] ?? '0').lt(dto.monto)) {
           throw new BadRequestException(
-            `No hay suficiente ${METODOS_PAGO[dto.metodo].nombre.toLowerCase()} en caja: hay ${esperado[dto.metodo] ?? '0.00'}`,
+            `No hay suficiente ${METODOS_PAGO[dto.metodo].nombre} en caja: hay ${esperado[dto.metodo] ?? '0.00'}`,
           );
         }
       }
@@ -162,6 +164,11 @@ export class CajaService {
         GROUP BY vuelto_metodo`,
       [sesion.id],
     );
+    const reintegrosNc: { metodo: string; monto: string }[] = await m.query(
+      `SELECT reintegro_metodo AS metodo, sum(reintegro_monto) AS monto
+         FROM notas_credito WHERE sesion_id = $1 GROUP BY reintegro_metodo`,
+      [sesion.id],
+    );
     const movimientos = await m.getRepository(MovimientoCaja).find({ where: { sesionId: sesion.id }, order: { id: 'ASC' } });
 
     const cobrado: Record<string, Dec> = {};
@@ -177,6 +184,11 @@ export class CajaService {
     for (const v of vueltos) {
       sumar(vuelto, v.metodo, dec(v.monto));
       sumar(esperado, v.metodo, dec(v.monto).negated());
+    }
+    const reintegros: Record<string, Dec> = {};
+    for (const r of reintegrosNc) {
+      sumar(reintegros, r.metodo, dec(r.monto));
+      sumar(esperado, r.metodo, dec(r.monto).negated());
     }
     for (const mov of movimientos) sumar(esperado, mov.metodo, dec(mov.monto).times(SIGNO_MOVIMIENTO[mov.tipo]));
 
@@ -201,6 +213,7 @@ export class CajaService {
       },
       cobrado: aTextos(cobrado),
       vuelto: aTextos(vuelto),
+      reintegros: aTextos(reintegros),
       movimientos,
       esperado: esperadoTexto,
       diferencias,

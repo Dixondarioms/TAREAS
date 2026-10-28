@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
@@ -21,6 +22,7 @@ import { ConsultaPaginada } from '../comun/paginacion';
 import { EsDecimal, EsRif } from '../comun/validadores';
 import { EstadoVenta } from './entidades/venta.entity';
 import { TipoMovimientoCaja } from './entidades/movimiento-caja.entity';
+import { TipoDocumento } from './entidades/talonario.entity';
 import { METODOS_EFECTIVO, MetodoPago } from './metodos-pago';
 
 // ------------------------------------------------------------------ clientes
@@ -58,6 +60,10 @@ export class BuscarClientesDto extends ConsultaPaginada {
 
 export class CrearTalonarioDto {
   @IsOptional()
+  @IsEnum(TipoDocumento)
+  tipo?: TipoDocumento;
+
+  @IsOptional()
   @IsString()
   @Matches(/^[A-Za-z0-9-]{0,10}$/, { message: 'serie: hasta 10 letras o números' })
   serie?: string;
@@ -87,6 +93,10 @@ export class CrearTalonarioDto {
 }
 
 export class AnularNumeroDto {
+  @IsOptional()
+  @IsEnum(TipoDocumento)
+  tipo?: TipoDocumento;
+
   @IsString()
   @MinLength(3, { message: 'Indique por qué se anula la factura' })
   @MaxLength(200)
@@ -245,4 +255,36 @@ export class BuscarVentasDto extends ConsultaPaginada {
   @IsString()
   @MaxLength(100)
   q?: string;
+}
+
+// ------------------------------------------------------------------ notas de crédito
+
+export class LineaNotaCreditoDto {
+  @IsInt()
+  ventaLineaId: number;
+
+  /** En la unidad en que se vendió la línea. */
+  @EsDecimal({ min: '0.001', decimales: 3 })
+  cantidad: string;
+}
+
+export class CrearNotaCreditoDto {
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Indique qué se devuelve' })
+  @ArrayMaxSize(300)
+  @ValidateNested({ each: true })
+  @Type(() => LineaNotaCreditoDto)
+  lineas: LineaNotaCreditoDto[];
+
+  @IsString()
+  @MinLength(3, { message: 'Indique el motivo de la nota de crédito' })
+  @MaxLength(200)
+  motivo: string;
+
+  /** false si la mercancía llegó dañada y no vuelve a la venta. */
+  @IsBoolean()
+  devolverInventario: boolean;
+
+  @IsEnum(MetodoPago)
+  reintegroMetodo: MetodoPago;
 }

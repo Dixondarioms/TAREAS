@@ -160,7 +160,11 @@ function AbrirCaja({ alAbrir }: { alAbrir: () => void }) {
 export function ReporteCaja({ resumen }: { resumen: ResumenCaja }) {
   const s = resumen.sesion;
   const metodos = LISTA_METODOS.filter(
-    (m) => resumen.esperado[m] !== undefined || resumen.cobrado[m] !== undefined || s.contado?.[m] !== undefined,
+    (m) =>
+      resumen.esperado[m] !== undefined ||
+      resumen.cobrado[m] !== undefined ||
+      resumen.reintegros[m] !== undefined ||
+      s.contado?.[m] !== undefined,
   );
   const cerrada = s.estado === 'CERRADA';
   return (
@@ -193,6 +197,7 @@ export function ReporteCaja({ resumen }: { resumen: ResumenCaja }) {
             <th className={th}>Método</th>
             <th className={`${th} text-right`}>Cobrado</th>
             <th className={`${th} text-right`}>Vuelto</th>
+            <th className={`${th} text-right`}>Reintegros</th>
             <th className={`${th} text-right`}>Esperado</th>
             {cerrada && <th className={`${th} text-right`}>Contado</th>}
             {cerrada && <th className={`${th} text-right`}>Diferencia</th>}
@@ -206,6 +211,7 @@ export function ReporteCaja({ resumen }: { resumen: ResumenCaja }) {
                 <td className={td}>{METODOS[m].nombre}</td>
                 <td className={`${td} cifra text-right`}>{monto(m, resumen.cobrado[m])}</td>
                 <td className={`${td} cifra text-right text-slate-500`}>{monto(m, resumen.vuelto[m])}</td>
+                <td className={`${td} cifra text-right text-slate-500`}>{monto(m, resumen.reintegros[m])}</td>
                 <td className={`${td} cifra text-right font-medium`}>{monto(m, resumen.esperado[m])}</td>
                 {cerrada && <td className={`${td} cifra text-right`}>{monto(m, s.contado?.[m])}</td>}
                 {cerrada && (
@@ -224,8 +230,8 @@ export function ReporteCaja({ resumen }: { resumen: ResumenCaja }) {
         </tbody>
       </Tabla>
       <p className="mt-2 text-xs text-slate-500">
-        Fondo inicial: Bs {numero(s.fondoBs, 2)} y $ {numero(s.fondoUsd, 2)}. Esperado = fondo + cobrado − vuelto ± retiros,
-        gastos e ingresos.
+        Fondo inicial: Bs {numero(s.fondoBs, 2)} y $ {numero(s.fondoUsd, 2)}. Esperado = fondo + cobrado − vuelto − reintegros ±
+        retiros, gastos e ingresos.
       </p>
       {resumen.movimientos.length > 0 && (
         <div className="mt-4">
