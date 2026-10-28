@@ -96,7 +96,7 @@ $backend = Join-Path $raiz 'backend'
 $api = Join-Path $dist 'api'
 New-Item -ItemType Directory -Path $api | Out-Null
 foreach ($c in @('dist', 'node_modules', 'package.json')) { Copy-Item (Join-Path $backend $c) $api -Recurse }
-if (Test-Path (Join-Path $api 'node_modules\typescript')) { throw 'node_modules incluye dependencias de desarrollo: ejecute npm prune --omit=dev' }
+if (Test-Path (Join-Path $api 'node_modules\jest')) { throw 'node_modules incluye dependencias de desarrollo: ejecute npm prune --omit=dev' }
 Copy-Item (Join-Path $raiz 'frontend\dist') (Join-Path $dist 'web') -Recurse
 Copy-Item (Join-Path $aqui 'scripts') $dist -Recurse
 
