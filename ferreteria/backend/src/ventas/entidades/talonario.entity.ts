@@ -4,6 +4,7 @@ import { Usuario } from '../../usuarios/usuario.entity';
 export enum TipoDocumento {
   FACTURA = 'FACTURA',
   NOTA_CREDITO = 'NOTA_CREDITO',
+  NOTA_DEBITO = 'NOTA_DEBITO',
 }
 
 /**

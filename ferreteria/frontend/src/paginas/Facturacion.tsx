@@ -173,7 +173,9 @@ export function Facturacion() {
               <tbody className="divide-y divide-slate-100">
                 {talonarios.data?.map((t) => (
                   <tr key={t.id}>
-                    <td className={td}>{t.tipo === 'NOTA_CREDITO' ? 'Nota de crédito' : 'Factura'}</td>
+                    <td className={td}>
+                      {{ FACTURA: 'Factura', NOTA_CREDITO: 'Nota de crédito', NOTA_DEBITO: 'Nota de débito' }[t.tipo]}
+                    </td>
                     <td className={td}>{t.serie || '—'}</td>
                     <td className={`${td} cifra`}>
                       {rellenar(t.numeroDesde, t.digitos)} – {rellenar(t.numeroHasta, t.digitos)}
@@ -261,6 +263,7 @@ export function Facturacion() {
           >
             <option value="FACTURA">Facturas</option>
             <option value="NOTA_CREDITO">Notas de crédito</option>
+            <option value="NOTA_DEBITO">Notas de débito</option>
           </Selector>
           <div className="grid gap-3 sm:grid-cols-2">
             <Campo etiqueta="Desde el N°" inputMode="numeric" required {...campo('numeroDesde')} autoFocus />

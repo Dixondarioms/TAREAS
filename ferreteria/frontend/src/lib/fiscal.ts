@@ -17,7 +17,7 @@ interface MontosLibro {
 
 export interface FilaLibroVentas extends MontosLibro {
   fecha: string;
-  documento: 'FACTURA' | 'NOTA_CREDITO';
+  documento: 'FACTURA' | 'NOTA_CREDITO' | 'NOTA_DEBITO';
   numero: string;
   numeroControl: string;
   facturaAfectada: string | null;
@@ -25,6 +25,8 @@ export interface FilaLibroVentas extends MontosLibro {
   rif: string | null;
   nombre: string;
   igtfBs: string;
+  ivaRetenidoBs: string;
+  comprobanteRetencion: string | null;
 }
 
 export interface FilaLibroCompras extends MontosLibro {
@@ -37,6 +39,7 @@ export interface FilaLibroCompras extends MontosLibro {
   rif: string;
   nombre: string;
   ivaRetenidoBs: string;
+  numeroComprobante: string | null;
 }
 
 export interface Libro<F> {
@@ -45,11 +48,36 @@ export interface Libro<F> {
   totales: Record<string, string>;
 }
 
+export interface ComprobanteRetencion {
+  agente: { razonSocial: string; rif: string; direccion: string; telefono: string };
+  periodo: string;
+  factura: {
+    id: number;
+    tipo: TipoDocumentoCompra;
+    fecha: string;
+    numero: string;
+    numeroControl: string;
+    facturaAfectada: string | null;
+    proveedor: { rif: string; razonSocial: string; direccion: string | null };
+    totalBs: string;
+    baseExentaBs: string;
+    baseGeneralBs: string;
+    ivaGeneralBs: string;
+    baseReducidaBs: string;
+    ivaReducidaBs: string;
+    porcentajeRetencion: string;
+    ivaRetenidoBs: string;
+    numeroComprobante: string;
+    fechaComprobante: string;
+  };
+}
+
 export interface ResumenIva {
   mes: string;
   debitoFiscalBs: string;
   creditoFiscalBs: string;
   ivaRetenidoBs: string;
+  retencionesRecibidasBs: string;
   diferenciaBs: string;
   igtfPercibidoBs: string;
 }

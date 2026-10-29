@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { EsDecimal } from '../comun/validadores';
 import { TipoDocumentoCompra } from './factura-compra.entity';
 
@@ -56,12 +56,20 @@ export class CrearFacturaCompraDto {
   @EsDecimal({ min: '0', decimales: 2 })
   ivaReducidaBs?: string;
 
+  /** Solo si la empresa es agente de retención: 75 (general) o 100. */
   @IsOptional()
-  @EsDecimal({ min: '0', decimales: 2 })
-  ivaRetenidoBs?: string;
+  @IsIn([75, 100])
+  porcentajeRetencion?: 75 | 100;
 
   @IsOptional()
   @IsString()
   @MaxLength(2000)
   notas?: string;
+}
+
+export class ConsultaQuincenaDto extends ConsultaMesDto {
+  /** 1: del 1 al 15; 2: del 16 al fin de mes. */
+  @IsOptional()
+  @IsIn(['1', '2'], { message: 'quincena debe ser 1 o 2' })
+  quincena?: '1' | '2';
 }

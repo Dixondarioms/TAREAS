@@ -159,6 +159,18 @@ export class VentasService {
       if (dec(c.faltanteBs).gt(0)) throw new BadRequestException(`Faltan Bs ${c.faltanteBs} por cobrar`);
       const creditoBs = c.pagos.filter((p) => p.metodo === MetodoPago.CREDITO).reduce((s, p) => s.plus(p.montoBs), dec(0));
       if (creditoBs.gt(0) && !dto.clienteId) throw new BadRequestException('Para vender a crédito elija el cliente');
+      const retencionBs = c.pagos
+        .filter((p) => p.metodo === MetodoPago.RETENCION_IVA)
+        .reduce((s, p) => s.plus(p.montoBs), dec(0));
+      if (retencionBs.gt(0)) {
+        if (!dto.clienteId)
+          throw new BadRequestException('Para registrar una retención de IVA elija el cliente agente de retención');
+        const iva = dec(c.ivaGeneralBs).plus(c.ivaReducidaBs);
+        if (retencionBs.gt(iva))
+          throw new BadRequestException(
+            `La retención (Bs ${retencionBs.toFixed(2)}) supera el IVA de la factura (Bs ${iva.toFixed(2)})`,
+          );
+      }
       if (creditoBs.gt(0) && dec(c.vueltoBs).gt(0)) {
         throw new BadRequestException('Una venta a crédito no puede dar vuelto: reduzca el monto fiado');
       }

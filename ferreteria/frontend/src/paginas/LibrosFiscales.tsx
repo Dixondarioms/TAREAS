@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus, Trash2 } from 'lucide-react';
+import { Download, Plus, Printer, Trash2 } from 'lucide-react';
 import { FormEvent, ReactNode, useState } from 'react';
 import { useAvisos } from '../componentes/avisos';
 import {
@@ -20,10 +20,18 @@ import {
 import { api, descargar } from '../lib/api';
 import { useConfiguracion } from '../lib/consultas';
 import { aDecimalApi, fecha, numero } from '../lib/formato';
-import { FilaLibroCompras, FilaLibroVentas, Libro, NOMBRE_DOCUMENTO, ResumenIva, TipoDocumentoCompra } from '../lib/fiscal';
+import {
+  ComprobanteRetencion,
+  FilaLibroCompras,
+  FilaLibroVentas,
+  Libro,
+  NOMBRE_DOCUMENTO,
+  ResumenIva,
+  TipoDocumentoCompra,
+} from '../lib/fiscal';
 import { Pagina, Proveedor } from '../lib/tipos';
 
-type Pestana = 'ventas' | 'compras' | 'resumen';
+type Pestana = 'ventas' | 'compras' | 'retenciones' | 'resumen';
 
 const mesActual = () => {
   const hoy = new Date();
@@ -51,7 +59,7 @@ export function LibrosFiscales() {
         acciones={
           <>
             <Campo type="month" aria-label="Mes" value={mes} onChange={(e) => e.target.value && setMes(e.target.value)} />
-            {pestana !== 'resumen' && (
+            {(pestana === 'ventas' || pestana === 'compras') && (
               <Boton
                 variante="secundario"
                 icono={<Download className="size-4" />}
@@ -68,6 +76,7 @@ export function LibrosFiscales() {
           [
             ['ventas', 'Libro de ventas'],
             ['compras', 'Libro de compras'],
+            ['retenciones', 'Retenciones de IVA'],
             ['resumen', 'Resumen del IVA'],
           ] as const
         ).map(([valor, texto]) => (
@@ -85,6 +94,7 @@ export function LibrosFiscales() {
       </div>
       {pestana === 'ventas' && <LibroVentas mes={mes} />}
       {pestana === 'compras' && <LibroCompras mes={mes} />}
+      {pestana === 'retenciones' && <Retenciones mes={mes} />}
       {pestana === 'resumen' && <Resumen mes={mes} />}
     </>
   );
@@ -139,6 +149,7 @@ function LibroVentas({ mes }: { mes: string }) {
             <th className={`${th} text-right`}>Base 8 %</th>
             <th className={`${th} text-right`}>IVA 8 %</th>
             <th className={`${th} text-right`}>IGTF</th>
+            <th className={`${th} text-right`}>IVA retenido</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -166,11 +177,15 @@ function LibroVentas({ mes }: { mes: string }) {
                   <Monto valor={f[k]} />
                 </td>
               ))}
+              <td className={`${td} cifra text-right`}>
+                <Monto valor={f.ivaRetenidoBs} />
+                {f.comprobanteRetencion && <div className="text-xs text-slate-500">comp. {f.comprobanteRetencion}</div>}
+              </td>
             </tr>
           ))}
           {l.filas.length === 0 ? (
             <tr>
-              <td colSpan={11} className={`${td} py-8 text-center text-slate-500`}>
+              <td colSpan={12} className={`${td} py-8 text-center text-slate-500`}>
                 No hay ventas en este mes.
               </td>
             </tr>
@@ -189,6 +204,7 @@ function LibroVentas({ mes }: { mes: string }) {
                 'baseReducidaBs',
                 'ivaReducidaBs',
                 'igtfBs',
+                'ivaRetenidoBs',
               ]}
             />
           )}
@@ -210,7 +226,7 @@ const VACIO = {
   ivaGeneralBs: '',
   baseReducidaBs: '',
   ivaReducidaBs: '',
-  ivaRetenidoBs: '',
+  porcentajeRetencion: '75',
   notas: '',
 };
 
@@ -219,6 +235,7 @@ function LibroCompras({ mes }: { mes: string }) {
   const consultas = useQueryClient();
   const config = useConfiguracion();
   const [registrando, setRegistrando] = useState(false);
+  const [comprobante, setComprobante] = useState<number | null>(null);
   const [form, setForm] = useState(VACIO);
   const libro = useQuery({
     queryKey: ['fiscal', 'compras', mes],
@@ -246,7 +263,7 @@ function LibroCompras({ mes }: { mes: string }) {
         ivaGeneralBs: dec(form.ivaGeneralBs),
         baseReducidaBs: dec(form.baseReducidaBs),
         ivaReducidaBs: dec(form.ivaReducidaBs),
-        ivaRetenidoBs: dec(form.ivaRetenidoBs),
+        porcentajeRetencion: agente ? Number(form.porcentajeRetencion) : undefined,
         notas: form.notas || undefined,
       }),
     onSuccess: () => {
@@ -277,6 +294,7 @@ function LibroCompras({ mes }: { mes: string }) {
     onChange: (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value }),
   });
   const alicuotas = config.data?.alicuotasIva;
+  const agente = Boolean(config.data?.empresa.contribuyenteEspecial);
 
   if (libro.isLoading) return <Cargando />;
   if (libro.error) return <Aviso tipo="error">{libro.error.message}</Aviso>;
@@ -320,6 +338,15 @@ function LibroCompras({ mes }: { mes: string }) {
               <td className={`${td} whitespace-nowrap`}>
                 {NOMBRE_DOCUMENTO[f.documento]} <span className="cifra">{f.numero}</span>
                 {f.facturaAfectada && <div className="text-xs text-slate-500">afecta factura {f.facturaAfectada}</div>}
+                {f.numeroComprobante && (
+                  <button
+                    type="button"
+                    className="block text-xs text-marca-700 hover:underline print:hidden"
+                    onClick={() => setComprobante(f.id)}
+                  >
+                    Comprobante {f.numeroComprobante}
+                  </button>
+                )}
               </td>
               <td className={`${td} cifra`}>{f.numeroControl}</td>
               <td className={td}>
@@ -383,6 +410,7 @@ function LibroCompras({ mes }: { mes: string }) {
         </tbody>
       </Tabla>
 
+      <ModalComprobante id={comprobante} alCerrar={() => setComprobante(null)} />
       <Modal titulo="Registrar factura de compra" abierto={registrando} alCerrar={() => setRegistrando(false)} ancho="max-w-2xl">
         <form
           className="space-y-3"
@@ -431,15 +459,15 @@ function LibroCompras({ mes }: { mes: string }) {
             />
             <Campo etiqueta={`IVA ${alicuotas?.REDUCIDA ?? 8} %`} inputMode="decimal" {...campo('ivaReducidaBs')} />
           </Fila>
-          <Fila>
-            <Campo
-              etiqueta="IVA retenido al proveedor"
-              inputMode="decimal"
-              ayuda="Solo si la ferretería es agente de retención"
-              {...campo('ivaRetenidoBs')}
-            />
-            <span />
-          </Fila>
+          {agente && (
+            <Fila>
+              <Selector etiqueta="Retención de IVA" {...campo('porcentajeRetencion')}>
+                <option value="75">75 % (general)</option>
+                <option value="100">100 %</option>
+              </Selector>
+              <p className="self-end text-xs text-slate-500">Se emite el comprobante de retención al registrar.</p>
+            </Fila>
+          )}
           <AreaTexto etiqueta="Notas" rows={2} {...campo('notas')} />
           <div className="flex justify-end gap-2">
             <Boton variante="fantasma" onClick={() => setRegistrando(false)}>
@@ -476,20 +504,184 @@ function Resumen({ mes }: { mes: string }) {
       <div className="text-sm text-slate-700">
         {linea('Débito fiscal (IVA de ventas menos notas de crédito)', d.debitoFiscalBs)}
         {linea('Crédito fiscal (IVA de compras)', d.creditoFiscalBs)}
+        {Number(d.retencionesRecibidasBs) > 0 && linea('Retenciones que le hicieron sus clientes', d.retencionesRecibidasBs)}
         {linea(
-          diferencia >= 0 ? 'Cuota del período (débito − crédito)' : 'Excedente de crédito para el mes siguiente',
+          diferencia >= 0 ? 'Cuota del período (débito − crédito − retenciones)' : 'Excedente de crédito para el mes siguiente',
           Math.abs(diferencia).toFixed(2),
           true,
         )}
         <div className="mt-3 space-y-1 text-xs text-slate-500">
           <div>IVA retenido a proveedores: Bs {numero(d.ivaRetenidoBs, 2)} (se entera aparte; no reduce la cuota).</div>
           <div>IGTF percibido en ventas: Bs {numero(d.igtfPercibidoBs, 2)}.</div>
-          <div>
-            Es una ayuda para la declaración: no incluye retenciones que le hayan hecho sus clientes ni excedentes de meses
-            anteriores.
-          </div>
+          <div>Es una ayuda para la declaración: no incluye excedentes ni retenciones de meses anteriores.</div>
         </div>
       </div>
     </Tarjeta>
+  );
+}
+
+function Retenciones({ mes }: { mes: string }) {
+  const avisos = useAvisos();
+  const [comprobante, setComprobante] = useState<number | null>(null);
+  const r = useQuery({
+    queryKey: ['fiscal', 'retenciones', mes],
+    queryFn: () =>
+      api.get<(ComprobanteRetencion['factura'] & { proveedor: { rif: string; razonSocial: string } })[]>('/fiscal/retenciones', {
+        mes,
+      }),
+  });
+  const txt = (quincena: 1 | 2) =>
+    descargar(`/fiscal/retenciones/txt?mes=${mes}&quincena=${quincena}`, `retenciones-iva-${mes}-q${quincena}.txt`).catch(
+      avisos.error,
+    );
+  if (r.isLoading) return <Cargando />;
+  if (r.error) return <Aviso tipo="error">{r.error.message}</Aviso>;
+  return (
+    <Tarjeta
+      titulo="Comprobantes de retención emitidos"
+      acciones={
+        <>
+          <Boton variante="secundario" icono={<Download className="size-4" />} onClick={() => void txt(1)}>
+            TXT 1.ª quincena
+          </Boton>
+          <Boton variante="secundario" icono={<Download className="size-4" />} onClick={() => void txt(2)}>
+            TXT 2.ª quincena
+          </Boton>
+        </>
+      }
+    >
+      <p className="mb-3 text-sm text-slate-600">
+        Los comprobantes se emiten solos al registrar facturas de proveedores cuando la empresa es agente de retención
+        (Configuración). El archivo TXT es para el portal del SENIAT: revise el formato con su contador antes de la primera
+        declaración.
+      </p>
+      <Tabla>
+        <thead>
+          <tr>
+            <th className={th}>Comprobante</th>
+            <th className={th}>Proveedor</th>
+            <th className={th}>Documento</th>
+            <th className={`${th} text-right`}>IVA</th>
+            <th className={`${th} text-right`}>%</th>
+            <th className={`${th} text-right`}>Retenido</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {r.data!.map((f) => (
+            <tr key={f.id} className="cursor-pointer hover:bg-marca-50/60" onClick={() => setComprobante(f.id)}>
+              <td className={td}>
+                <div className="cifra font-medium">{f.numeroComprobante}</div>
+                <div className="text-xs text-slate-500">{fecha(f.fechaComprobante)}</div>
+              </td>
+              <td className={td}>
+                <div>{f.proveedor.razonSocial}</div>
+                <div className="text-xs text-slate-500">{f.proveedor.rif}</div>
+              </td>
+              <td className={td}>
+                {NOMBRE_DOCUMENTO[f.tipo]} <span className="cifra">{f.numero}</span>
+              </td>
+              <td className={`${td} cifra text-right`}>{numero(Number(f.ivaGeneralBs) + Number(f.ivaReducidaBs), 2)}</td>
+              <td className={`${td} cifra text-right`}>{numero(f.porcentajeRetencion, 0)}</td>
+              <td className={`${td} cifra text-right font-medium`}>{numero(f.ivaRetenidoBs, 2)}</td>
+            </tr>
+          ))}
+          {r.data!.length === 0 && (
+            <tr>
+              <td colSpan={6} className={`${td} py-8 text-center text-slate-500`}>
+                No se emitieron comprobantes en este mes.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </Tabla>
+      <ModalComprobante id={comprobante} alCerrar={() => setComprobante(null)} />
+    </Tarjeta>
+  );
+}
+
+/** Comprobante de retención de IVA para imprimir y entregar al proveedor. */
+function ModalComprobante({ id, alCerrar }: { id: number | null; alCerrar: () => void }) {
+  const r = useQuery({
+    queryKey: ['fiscal', 'comprobante', id],
+    queryFn: () => api.get<ComprobanteRetencion>(`/fiscal/compras/${id}/comprobante`),
+    enabled: id !== null,
+  });
+  const c = r.data;
+  const f = c?.factura;
+  const fila = (texto: string, valor: string) => (
+    <div className="flex justify-between gap-3">
+      <span>{texto}</span>
+      <span className="cifra">Bs {numero(valor, 2)}</span>
+    </div>
+  );
+  return (
+    <Modal titulo="Comprobante de retención de IVA" abierto={id !== null} alCerrar={alCerrar} ancho="max-w-2xl">
+      {!c || !f ? (
+        <Cargando />
+      ) : (
+        <div className="space-y-4 text-sm text-slate-700">
+          <div className="flex flex-wrap justify-between gap-3 border-b border-slate-200 pb-3">
+            <div>
+              <div className="text-xs text-slate-500 uppercase">Agente de retención</div>
+              <div className="font-semibold text-slate-900">{c.agente.razonSocial}</div>
+              <div>RIF {c.agente.rif}</div>
+              {c.agente.direccion && <div className="text-xs text-slate-500">{c.agente.direccion}</div>}
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-slate-500 uppercase">Comprobante N°</div>
+              <div className="cifra text-lg font-semibold text-slate-900">{f.numeroComprobante}</div>
+              <div>Fecha {fecha(f.fechaComprobante)}</div>
+              <div>
+                Período fiscal {c.periodo.slice(0, 4)}-{c.periodo.slice(4)}
+              </div>
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 uppercase">Sujeto retenido</div>
+            <div className="font-medium text-slate-900">{f.proveedor.razonSocial}</div>
+            <div>RIF {f.proveedor.rif}</div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div>
+              <div className="text-xs text-slate-500 uppercase">Documento</div>
+              {NOMBRE_DOCUMENTO[f.tipo]} {f.numero}
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 uppercase">N° de control</div>
+              {f.numeroControl}
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 uppercase">Fecha</div>
+              {fecha(f.fecha)}
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 uppercase">Factura afectada</div>
+              {f.facturaAfectada ?? '—'}
+            </div>
+          </div>
+          <div className="ml-auto max-w-sm space-y-1">
+            {fila('Total del documento (con IVA)', f.totalBs)}
+            {Number(f.baseExentaBs) > 0 && fila('Exento', f.baseExentaBs)}
+            {Number(f.baseGeneralBs) > 0 && fila('Base imponible alícuota general', f.baseGeneralBs)}
+            {Number(f.ivaGeneralBs) > 0 && fila('IVA alícuota general', f.ivaGeneralBs)}
+            {Number(f.baseReducidaBs) > 0 && fila('Base imponible alícuota reducida', f.baseReducidaBs)}
+            {Number(f.ivaReducidaBs) > 0 && fila('IVA alícuota reducida', f.ivaReducidaBs)}
+            <div className="flex justify-between gap-3 border-t border-slate-200 pt-1 font-semibold text-slate-900">
+              <span>IVA retenido ({numero(f.porcentajeRetencion, 0)} %)</span>
+              <span className="cifra">Bs {numero(f.ivaRetenidoBs, 2)}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-8 pt-10 text-center text-xs text-slate-500">
+            <div className="border-t border-slate-400 pt-1">Firma y sello del agente de retención</div>
+            <div className="border-t border-slate-400 pt-1">Recibido por el proveedor</div>
+          </div>
+          <div className="flex justify-end print:hidden">
+            <Boton variante="secundario" icono={<Printer className="size-4" />} onClick={() => window.print()}>
+              Imprimir
+            </Boton>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

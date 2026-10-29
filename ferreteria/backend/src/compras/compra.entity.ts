@@ -63,7 +63,11 @@ export class Compra {
   @Column({ type: 'date', nullable: true })
   vencimiento: string | null;
 
-  /** Lo que falta pagar, en la moneda de la compra. */
+  /** IVA retenido al proveedor (se paga al SENIAT), en la moneda de la compra. */
+  @Column({ type: 'numeric', precision: 18, scale: 2, default: 0 })
+  retencionIva: string;
+
+  /** Lo que falta pagar al proveedor (total − retención − abonos), en la moneda de la compra. */
   @Column({ type: 'numeric', precision: 18, scale: 2 })
   saldo: string;
 

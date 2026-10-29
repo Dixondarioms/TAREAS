@@ -9,6 +9,7 @@ import { ConfiguracionService } from '../configuracion/configuracion.service';
 import { Proveedor } from '../proveedores/proveedor.entity';
 import { FacturaCompra, TipoDocumentoCompra } from './factura-compra.entity';
 import { CrearFacturaCompraDto } from './fiscal.dto';
+import { retenerIva } from './retenciones';
 
 /** Tolerancia al comparar el IVA escrito con el calculado (redondeos por renglón en la factura del proveedor). */
 const TOLERANCIA_IVA = dec('1.00');
@@ -17,7 +18,7 @@ export type TipoTransaccion = '01-REG' | '03-ANU';
 
 export interface FilaLibroVentas {
   fecha: string;
-  documento: 'FACTURA' | 'NOTA_CREDITO';
+  documento: 'FACTURA' | 'NOTA_CREDITO' | 'NOTA_DEBITO';
   numero: string;
   numeroControl: string;
   facturaAfectada: string | null;
@@ -31,6 +32,9 @@ export interface FilaLibroVentas {
   baseReducidaBs: string;
   ivaReducidaBs: string;
   igtfBs: string;
+  /** IVA que retuvo el comprador (agente de retención) y su comprobante. */
+  ivaRetenidoBs: string;
+  comprobanteRetencion: string | null;
 }
 
 export interface FilaLibroCompras {
@@ -50,6 +54,7 @@ export interface FilaLibroCompras {
   baseReducidaBs: string;
   ivaReducidaBs: string;
   ivaRetenidoBs: string;
+  numeroComprobante: string | null;
 }
 
 type Montos = Pick<
@@ -69,7 +74,9 @@ export interface ResumenIva {
   debitoFiscalBs: string;
   creditoFiscalBs: string;
   ivaRetenidoBs: string;
-  /** Débito − crédito − retenciones: positivo = a pagar; negativo = excedente para el mes siguiente. */
+  /** IVA que le retuvieron sus clientes agentes de retención: se descuenta de la cuota. */
+  retencionesRecibidasBs: string;
+  /** Débito − crédito − retenciones recibidas: positivo = a pagar; negativo = excedente para el mes siguiente. */
   diferenciaBs: string;
   igtfPercibidoBs: string;
 }
@@ -115,7 +122,7 @@ export class FiscalService {
     if (tipo !== TipoDocumentoCompra.FACTURA && !dto.facturaAfectada?.trim()) {
       throw new BadRequestException('Indique el número de la factura que modifica la nota');
     }
-    const { alicuotasIva } = await this.configuracion.obtenerTodo();
+    const { alicuotasIva, empresa } = await this.configuracion.obtenerTodo();
     const montos = {
       baseExentaBs: dec(dto.baseExentaBs ?? '0'),
       baseGeneralBs: dec(dto.baseGeneralBs ?? '0'),
@@ -143,8 +150,8 @@ export class FiscalService {
         `Ya está registrada la ${tipo === 'FACTURA' ? 'factura' : 'nota'} ${numero} de ${proveedor.razonSocial}`,
       );
     }
-    return repo.save(
-      repo.create({
+    return this.ds.transaction(async (m) => {
+      const factura = m.create(FacturaCompra, {
         proveedorId: proveedor.id,
         tipo,
         fecha: dto.fecha,
@@ -157,16 +164,26 @@ export class FiscalService {
         baseReducidaBs: montos.baseReducidaBs.toFixed(2),
         ivaReducidaBs: montos.ivaReducidaBs.toFixed(2),
         totalBs: total.toFixed(2),
-        ivaRetenidoBs: dec(dto.ivaRetenidoBs ?? '0').toFixed(2),
         notas: dto.notas?.trim() || null,
         usuarioId: usuario.id,
-      }),
-    );
+      });
+      await retenerIva(m, factura, empresa.contribuyenteEspecial, dto.porcentajeRetencion ?? 75);
+      return m.save(factura);
+    });
   }
 
   async eliminarCompra(id: number): Promise<void> {
-    const r = await this.ds.getRepository(FacturaCompra).delete({ id });
-    if (!r.affected) throw new NotFoundException('Factura de compra no encontrada');
+    const factura = await this.ds.getRepository(FacturaCompra).findOneBy({ id });
+    if (!factura) throw new NotFoundException('Factura de compra no encontrada');
+    if (factura.numeroComprobante) {
+      throw new BadRequestException(
+        `Tiene el comprobante de retención ${factura.numeroComprobante} emitido: no se puede eliminar; registre una nota de crédito del proveedor`,
+      );
+    }
+    if (await this.ds.query(`SELECT 1 FROM compras WHERE factura_compra_id = $1`, [id]).then((r) => r.length)) {
+      throw new BadRequestException('Esta factura viene de una compra registrada: corríjala desde Compras');
+    }
+    await this.ds.getRepository(FacturaCompra).delete({ id });
   }
 
   // ------------------------------------------------------------------ libros
@@ -184,7 +201,9 @@ export class FiscalService {
     const ventas: Record<string, string>[] = await this.ds.query(
       `SELECT ${dia('v.creado_en')} AS fecha, v.serie, v.numero_factura, t.digitos, v.numero_control, v.estado,
               v.cliente_documento, v.cliente_nombre, v.total_bs, v.base_exenta_bs, v.base_general_bs, v.iva_general_bs,
-              v.base_reducida_bs, v.iva_reducida_bs, v.igtf_bs
+              v.base_reducida_bs, v.iva_reducida_bs, v.igtf_bs,
+              (SELECT coalesce(sum(p.monto_bs), 0) FROM ventas_pagos p WHERE p.venta_id = v.id AND p.metodo = 'RETENCION_IVA') AS retenido,
+              (SELECT string_agg(p.referencia, ', ') FROM ventas_pagos p WHERE p.venta_id = v.id AND p.metodo = 'RETENCION_IVA') AS comprobante
          FROM ventas v JOIN talonarios t ON t.id = v.talonario_id
         WHERE ${entre('v.creado_en')}`,
       [desde, hasta],
@@ -199,6 +218,17 @@ export class FiscalService {
          JOIN ventas v ON v.id = n.venta_id
          JOIN talonarios tv ON tv.id = v.talonario_id
         WHERE ${entre('n.creado_en')}`,
+      [desde, hasta],
+    );
+    const debitos: Record<string, string>[] = await this.ds.query(
+      `SELECT ${dia('d.creado_en')} AS fecha, d.serie, d.numero, t.digitos, d.numero_control, d.alicuota_iva,
+              v.serie AS serie_factura, v.numero_factura, tv.digitos AS digitos_factura,
+              v.cliente_documento, v.cliente_nombre, d.base_bs, d.iva_bs, d.total_bs
+         FROM notas_debito d
+         JOIN talonarios t ON t.id = d.talonario_id
+         JOIN ventas v ON v.id = d.venta_id
+         JOIN talonarios tv ON tv.id = v.talonario_id
+        WHERE ${entre('d.creado_en')}`,
       [desde, hasta],
     );
     const hojas: Record<string, string>[] = await this.ds.query(
@@ -233,6 +263,8 @@ export class FiscalService {
                 ivaReducidaBs: v.iva_reducida_bs,
               }),
           igtfBs: anulada ? '0.00' : v.igtf_bs,
+          ivaRetenidoBs: anulada ? '0.00' : dec(v.retenido).toFixed(2),
+          comprobanteRetencion: anulada ? null : v.comprobante,
         };
       }),
       ...notas.map((n): FilaLibroVentas => ({
@@ -251,10 +283,35 @@ export class FiscalService {
         baseReducidaBs: negar(n.base_reducida_bs),
         ivaReducidaBs: negar(n.iva_reducida_bs),
         igtfBs: '0.00',
+        ivaRetenidoBs: '0.00',
+        comprobanteRetencion: null,
       })),
+      ...debitos.map((d): FilaLibroVentas => {
+        const exento = d.alicuota_iva === 'EXENTO';
+        const reducida = d.alicuota_iva === 'REDUCIDA';
+        return {
+          fecha: d.fecha,
+          documento: 'NOTA_DEBITO',
+          numero: num(d.serie, d.numero, d.digitos),
+          numeroControl: d.numero_control,
+          facturaAfectada: num(d.serie_factura, d.numero_factura, d.digitos_factura),
+          tipoTransaccion: '01-REG',
+          rif: d.cliente_documento,
+          nombre: d.cliente_nombre,
+          totalBs: d.total_bs,
+          exentoBs: exento ? d.base_bs : '0.00',
+          baseGeneralBs: !exento && !reducida ? d.base_bs : '0.00',
+          ivaGeneralBs: !exento && !reducida ? d.iva_bs : '0.00',
+          baseReducidaBs: reducida ? d.base_bs : '0.00',
+          ivaReducidaBs: reducida ? d.iva_bs : '0.00',
+          igtfBs: '0.00',
+          ivaRetenidoBs: '0.00',
+          comprobanteRetencion: null,
+        };
+      }),
       ...hojas.map((h): FilaLibroVentas => ({
         fecha: h.fecha,
-        documento: h.tipo === 'NOTA_CREDITO' ? 'NOTA_CREDITO' : 'FACTURA',
+        documento: h.tipo as FilaLibroVentas['documento'],
         numero: num(h.serie, h.numero, h.digitos),
         numeroControl: h.numero_control,
         facturaAfectada: null,
@@ -263,11 +320,13 @@ export class FiscalService {
         nombre: 'ANULADA',
         ...cero,
         igtfBs: '0.00',
+        ivaRetenidoBs: '0.00',
+        comprobanteRetencion: null,
       })),
     ].sort(
       (a, b) => a.fecha.localeCompare(b.fecha) || a.documento.localeCompare(b.documento) || a.numero.localeCompare(b.numero),
     );
-    return { mes, filas, totales: totalizar(filas, [...CAMPOS_MONTO, 'igtfBs']) };
+    return { mes, filas, totales: totalizar(filas, [...CAMPOS_MONTO, 'igtfBs', 'ivaRetenidoBs']) };
   }
 
   /** Libro de compras del mes: documentos de proveedores por fecha de emisión; las notas de crédito restan. */
@@ -299,6 +358,7 @@ export class FiscalService {
         baseReducidaBs: s(f.baseReducidaBs),
         ivaReducidaBs: s(f.ivaReducidaBs),
         ivaRetenidoBs: s(f.ivaRetenidoBs),
+        numeroComprobante: f.numeroComprobante,
       };
     });
     return { mes, filas, totales: totalizar(filas, [...CAMPOS_MONTO, 'ivaRetenidoBs']) };
@@ -309,13 +369,15 @@ export class FiscalService {
     const [ventas, compras] = await Promise.all([this.libroVentas(mes), this.libroCompras(mes)]);
     const debito = dec(ventas.totales.ivaGeneralBs).plus(ventas.totales.ivaReducidaBs);
     const credito = dec(compras.totales.ivaGeneralBs).plus(compras.totales.ivaReducidaBs);
-    // Las retenciones que hace la ferretería las entera ella; no reducen su cuota. Se informan aparte.
+    // Las retenciones que hace la ferretería las entera ella y no reducen su cuota; las que le hicieron sus clientes sí.
+    const recibidas = dec(ventas.totales.ivaRetenidoBs);
     return {
       mes,
       debitoFiscalBs: debito.toFixed(2),
       creditoFiscalBs: credito.toFixed(2),
       ivaRetenidoBs: compras.totales.ivaRetenidoBs,
-      diferenciaBs: debito.minus(credito).toFixed(2),
+      retencionesRecibidasBs: recibidas.toFixed(2),
+      diferenciaBs: debito.minus(credito).minus(recibidas).toFixed(2),
       igtfPercibidoBs: ventas.totales.igtfBs,
     };
   }
@@ -343,6 +405,8 @@ export class FiscalService {
         ['Base imponible alícuota reducida', 'baseReducidaBs', 16, true],
         ['IVA alícuota reducida', 'ivaReducidaBs', 14, true],
         ['IGTF percibido', 'igtfBs', 13, true],
+        ['IVA retenido por el comprador', 'ivaRetenidoBs', 14, true],
+        ['N° comprobante de retención', 'comprobanteRetencion', 18],
       ],
       libro.filas as unknown as Record<string, unknown>[],
       libro.totales,

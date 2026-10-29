@@ -1,7 +1,15 @@
 import { AlicuotaIva, UsuarioSesion } from './tipos';
 
 export type MetodoPago =
-  'EFECTIVO_BS' | 'EFECTIVO_USD' | 'PAGO_MOVIL' | 'TRANSFERENCIA' | 'PUNTO_VENTA' | 'ZELLE' | 'BINANCE' | 'CREDITO';
+  | 'EFECTIVO_BS'
+  | 'EFECTIVO_USD'
+  | 'PAGO_MOVIL'
+  | 'TRANSFERENCIA'
+  | 'PUNTO_VENTA'
+  | 'ZELLE'
+  | 'BINANCE'
+  | 'CREDITO'
+  | 'RETENCION_IVA';
 
 /** Igual que en la API (ventas/metodos-pago.ts). */
 export const METODOS: Record<MetodoPago, { nombre: string; moneda: 'BS' | 'USD'; referencia: boolean; vuelto: boolean }> = {
@@ -13,10 +21,11 @@ export const METODOS: Record<MetodoPago, { nombre: string; moneda: 'BS' | 'USD';
   ZELLE: { nombre: 'Zelle', moneda: 'USD', referencia: true, vuelto: false },
   BINANCE: { nombre: 'Binance (USDT)', moneda: 'USD', referencia: true, vuelto: false },
   CREDITO: { nombre: 'Crédito (fiado)', moneda: 'BS', referencia: false, vuelto: false },
+  RETENCION_IVA: { nombre: 'Retención de IVA', moneda: 'BS', referencia: true, vuelto: false },
 };
 
 /** Métodos con los que entra o sale dinero (sin el crédito, que es fiado). */
-export const LISTA_METODOS = (Object.keys(METODOS) as MetodoPago[]).filter((m) => m !== 'CREDITO');
+export const LISTA_METODOS = (Object.keys(METODOS) as MetodoPago[]).filter((m) => m !== 'CREDITO' && m !== 'RETENCION_IVA');
 
 /** «Bs 1.234,56» o «$ 12,00» según la moneda del método. */
 export const simboloMoneda = (m: MetodoPago) => (METODOS[m].moneda === 'USD' ? '$' : 'Bs');
@@ -72,7 +81,7 @@ export interface PorCobrar {
   vencidoUsd: string;
 }
 
-export type TipoDocumento = 'FACTURA' | 'NOTA_CREDITO';
+export type TipoDocumento = 'FACTURA' | 'NOTA_CREDITO' | 'NOTA_DEBITO';
 
 export interface Talonario {
   id: number;
@@ -192,7 +201,7 @@ export interface ResumenCaja {
     observaciones: string | null;
     usuario?: { nombre: string };
   };
-  ventas: { cantidad: number; anuladas: number; totalBs: string; igtfBs: string; creditoBs: string };
+  ventas: { cantidad: number; anuladas: number; totalBs: string; igtfBs: string; creditoBs: string; retencionesBs: string };
   abonos: MontosPorMetodo;
   cobrado: MontosPorMetodo;
   vuelto: MontosPorMetodo;
@@ -236,6 +245,24 @@ export interface NotaCredito {
     cantidad: string;
     subtotalBs: string;
   }[];
+}
+
+export interface NotaDebito {
+  id: number;
+  serie: string;
+  numero: number;
+  numeroControl: string;
+  talonario?: { digitos: number };
+  concepto: string;
+  alicuotaIva: AlicuotaIva;
+  baseBs: string;
+  ivaBs: string;
+  totalBs: string;
+  metodo: MetodoPago;
+  monto: string;
+  referencia: string | null;
+  creadoEn: string;
+  usuario?: { nombre: string };
 }
 
 /** Número de nota de crédito con ceros a la izquierda y serie. */

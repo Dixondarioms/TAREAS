@@ -64,6 +64,17 @@ export class FacturaCompra {
   @Column({ type: 'numeric', precision: 18, scale: 2, default: 0 })
   ivaRetenidoBs: string;
 
+  /** 75 o 100; 0 si no hubo retención. */
+  @Column({ type: 'numeric', precision: 5, scale: 2, default: 0 })
+  porcentajeRetencion: string;
+
+  /** Comprobante de retención emitido: AAAAMM + 8 dígitos. */
+  @Column({ type: 'varchar', length: 14, nullable: true, unique: true })
+  numeroComprobante: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  fechaComprobante: string | null;
+
   @Column({ type: 'text', nullable: true })
   notas: string | null;
 

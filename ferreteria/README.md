@@ -24,6 +24,8 @@ Esta versión incluye las **fases 1 a 6** del plan: catálogo, precios en dos mo
 | Compras | Recepción de mercancía con la factura o nota de entrega del proveedor, en Bs o USD: entra al inventario, actualiza el costo de reposición (y los precios por margen) y el costo por proveedor, y registra la factura en el libro de compras. |
 | Cuentas por pagar | Saldo de cada compra en su moneda, abonos con método y referencia, y vencimientos con aviso de las vencidas. |
 | Clientes | Cédula o RIF validado (solo números se toman como cédula V-), nombre o razón social y dirección fiscal; sin cliente la factura sale a «Consumidor final». |
+| Retenciones de IVA | Si la empresa es agente de retención (contribuyente especial), cada factura de proveedor retiene el 75 % (o 100 %) del IVA, emite el comprobante numerado AAAAMM + 8 dígitos (imprimible), descuenta la retención de lo que se le debe al proveedor y genera el archivo TXT por quincena para el portal del SENIAT. Las retenciones que hacen los clientes agentes se cobran con el método «Retención de IVA» (con su número de comprobante), van al libro de ventas y se restan de la cuota. |
+| Notas de débito | Cargo adicional sobre una factura (flete, diferencia de precio), con su propio talonario; se cobra en caja y va al libro de ventas. |
 | Crédito a clientes | Límite en USD y días de plazo por cliente (lo asigna gerencia). Venta fiada total o parcial desde el punto de venta; la deuda se lleva en USD a la tasa de la factura. Abonos en cualquier moneda a la tasa del día, que entran a la caja y pagan primero lo que vence antes. Una nota de crédito de una venta fiada se descuenta de la deuda. |
 | Reportes | Ventas netas, ganancia bruta y margen en USD, facturado por día, cobrado por método, ventas por cajero y productos más vendidos, para cualquier período. |
 | Respaldos | Copia diaria automática de la base de datos y script de restauración. |
@@ -270,5 +272,4 @@ DB_NOMBRE_PRUEBAS=ferreteria_test npm run test:e2e
 ## Próximas fases
 
 1. **Órdenes de compra** previas a la recepción, y anulación de compras registradas por error.
-2. **Retenciones y notas de débito:** comprobantes de retención de IVA (emitidos y recibidos) y notas de débito.
-3. **Imprenta digital**, si el negocio migra a ese esquema según lo que defina el contador.
+2. **Imprenta digital**, si el negocio migra a ese esquema según lo que defina el contador.

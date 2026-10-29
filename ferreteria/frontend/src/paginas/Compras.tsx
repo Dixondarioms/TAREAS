@@ -324,6 +324,9 @@ function DetalleCompra({ id, alCerrar }: { id: number | null; alCerrar: () => vo
           <div className="ml-auto max-w-xs space-y-1">
             <Fila texto="Subtotal" valor={`${s} ${numero(c.subtotal, 2)}`} />
             <Fila texto="IVA" valor={`${s} ${numero(c.iva, 2)}`} />
+            {Number(c.retencionIva) > 0 && (
+              <Fila texto="IVA retenido (al SENIAT)" valor={`− ${s} ${numero(c.retencionIva, 2)}`} />
+            )}
             <Fila texto="Total" valor={`${s} ${numero(c.total, 2)}`} fuerte />
             <Fila texto="Saldo por pagar" valor={`${s} ${numero(c.saldo, 2)}`} fuerte />
           </div>

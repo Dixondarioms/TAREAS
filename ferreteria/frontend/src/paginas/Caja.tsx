@@ -192,7 +192,9 @@ export function ReporteCaja({ resumen }: { resumen: ResumenCaja }) {
         />
         <Dato
           titulo="Total facturado"
-          valor={`${bs(resumen.ventas.totalBs)}${Number(resumen.ventas.creditoBs) > 0 ? ` (${bs(resumen.ventas.creditoBs)} fiado)` : ''}`}
+          valor={`${bs(resumen.ventas.totalBs)}${Number(resumen.ventas.creditoBs) > 0 ? ` (${bs(resumen.ventas.creditoBs)} fiado)` : ''}${
+            Number(resumen.ventas.retencionesBs) > 0 ? ` (${bs(resumen.ventas.retencionesBs)} retenido)` : ''
+          }`}
         />
       </div>
       <Tabla>

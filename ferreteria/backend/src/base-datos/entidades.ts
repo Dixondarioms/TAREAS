@@ -20,6 +20,7 @@ import { AbonoCliente, AplicacionAbono, CuentaCobrar } from '../ventas/entidades
 import { FacturaAnulada } from '../ventas/entidades/factura-anulada.entity';
 import { MovimientoCaja } from '../ventas/entidades/movimiento-caja.entity';
 import { NotaCredito, NotaCreditoLinea } from '../ventas/entidades/nota-credito.entity';
+import { NotaDebito } from '../ventas/entidades/nota-debito.entity';
 import { SesionCaja } from '../ventas/entidades/sesion-caja.entity';
 import { Talonario } from '../ventas/entidades/talonario.entity';
 import { Venta, VentaLinea, VentaPago } from '../ventas/entidades/venta.entity';
@@ -50,6 +51,7 @@ export const ENTIDADES = [
   VentaPago,
   NotaCredito,
   NotaCreditoLinea,
+  NotaDebito,
   FacturaCompra,
   Compra,
   CompraLinea,

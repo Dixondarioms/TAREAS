@@ -8,6 +8,8 @@ export enum MetodoPago {
   BINANCE = 'BINANCE',
   /** Venta fiada: queda como cuenta por cobrar del cliente, en USD. */
   CREDITO = 'CREDITO',
+  /** El cliente es agente de retención: paga el IVA retenido con su comprobante. */
+  RETENCION_IVA = 'RETENCION_IVA',
 }
 
 export type MonedaPago = 'BS' | 'USD';
@@ -30,10 +32,11 @@ export const METODOS_PAGO: Record<MetodoPago, DefinicionMetodo> = {
   [MetodoPago.ZELLE]: { nombre: 'Zelle', moneda: 'USD', referencia: true, vuelto: false },
   [MetodoPago.BINANCE]: { nombre: 'Binance (USDT)', moneda: 'USD', referencia: true, vuelto: false },
   [MetodoPago.CREDITO]: { nombre: 'Crédito (fiado)', moneda: 'BS', referencia: false, vuelto: false },
+  [MetodoPago.RETENCION_IVA]: { nombre: 'Retención de IVA', moneda: 'BS', referencia: true, vuelto: false },
 };
 
 /** No mueven dinero en la caja: no cuentan en lo esperado ni en el arqueo. */
-export const METODOS_FUERA_DE_CAJA: MetodoPago[] = [MetodoPago.CREDITO];
+export const METODOS_FUERA_DE_CAJA: MetodoPago[] = [MetodoPago.CREDITO, MetodoPago.RETENCION_IVA];
 
 /** Métodos en efectivo: los únicos que admiten retiros, gastos e ingresos de caja. */
 export const METODOS_EFECTIVO = [MetodoPago.EFECTIVO_BS, MetodoPago.EFECTIVO_USD] as const;

@@ -74,6 +74,11 @@ export class CrearCompraDto {
   @IsBoolean()
   facturaFiscal: boolean;
 
+  /** Si la empresa es agente de retención: 75 (general) o 100. */
+  @IsOptional()
+  @IsIn([75, 100])
+  porcentajeRetencion?: 75 | 100;
+
   /** Actualizar el costo de reposición de los productos (solo gerencia). */
   @IsBoolean()
   actualizarCostos: boolean;

@@ -7,6 +7,7 @@ import { TipoDocumento } from './entidades/talonario.entity';
 import { ClientesService } from './clientes.service';
 import { CobranzaService } from './cobranza.service';
 import { NotasCreditoService } from './notas-credito.service';
+import { CrearNotaDebitoDto, NotasDebitoService } from './notas-debito.service';
 import { TalonariosService } from './talonarios.service';
 import {
   AbonoClienteDto,
@@ -90,7 +91,8 @@ export class TalonariosController {
   /** Próxima factura (o nota de crédito con ?tipo=NOTA_CREDITO) y cuántas quedan. */
   @Get('estado')
   estado(@Query('tipo') tipo?: string) {
-    return this.servicio.estado(tipo === TipoDocumento.NOTA_CREDITO ? TipoDocumento.NOTA_CREDITO : TipoDocumento.FACTURA);
+    const tipos = Object.values(TipoDocumento) as string[];
+    return this.servicio.estado(tipo && tipos.includes(tipo) ? (tipo as TipoDocumento) : TipoDocumento.FACTURA);
   }
 
   @Post()
@@ -166,6 +168,7 @@ export class VentasController {
   constructor(
     private readonly servicio: VentasService,
     private readonly notas: NotasCreditoService,
+    private readonly debitos: NotasDebitoService,
   ) {}
 
   /** Calcula totales, IGTF y vuelto sin guardar nada. */
@@ -200,6 +203,18 @@ export class VentasController {
   @Post(':id/notas-credito')
   notaCredito(@Param('id', ParseIntPipe) id: number, @Body() dto: CrearNotaCreditoDto, @UsuarioActual() u: UsuarioSesion) {
     return this.notas.crear(id, dto, u);
+  }
+
+  /** Cargo adicional sobre la factura, cobrado en la caja abierta. */
+  @Post(':id/notas-debito')
+  notaDebito(@Param('id', ParseIntPipe) id: number, @Body() dto: CrearNotaDebitoDto, @UsuarioActual() u: UsuarioSesion) {
+    return this.debitos.crear(id, dto, u);
+  }
+
+  @Get(':id/notas-debito')
+  async notasDebitoDeVenta(@Param('id', ParseIntPipe) id: number, @UsuarioActual() u: UsuarioSesion) {
+    await this.servicio.detalle(id, u);
+    return this.debitos.deVenta(id);
   }
 
   @Get(':id/notas-credito')

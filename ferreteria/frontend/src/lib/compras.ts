@@ -16,6 +16,7 @@ export interface Compra {
   total: string;
   condicion: 'CONTADO' | 'CREDITO';
   vencimiento: string | null;
+  retencionIva: string;
   saldo: string;
   actualizoCostos: boolean;
   facturaCompraId: number | null;

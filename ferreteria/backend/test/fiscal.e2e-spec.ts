@@ -270,6 +270,7 @@ describe('Módulo fiscal: notas de crédito y libros (integración)', () => {
         debitoFiscalBs: '208.00',
         creditoFiscalBs: '144.00',
         ivaRetenidoBs: '0.00',
+        retencionesRecibidasBs: '0.00',
         diferenciaBs: '64.00',
         igtfPercibidoBs: '0.00',
       });

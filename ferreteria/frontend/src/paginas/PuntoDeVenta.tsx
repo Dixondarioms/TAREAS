@@ -613,6 +613,11 @@ function ModalCobro({
   /** Lo que falta, expresado en la moneda del método (USD redondeado hacia arriba al céntimo). */
   const faltanteEn = (m: MetodoPago) => {
     if (faltante <= 0) return '';
+    if (m === 'RETENCION_IVA') {
+      // Lo usual: el agente retiene el 75 % del IVA de la factura.
+      const iva = c ? Number(c.ivaGeneralBs) + Number(c.ivaReducidaBs) : 0;
+      return Math.min(faltante, Math.round(iva * 0.75 * 100) / 100).toFixed(2);
+    }
     if (m === 'CREDITO') {
       // No más de lo que le queda de crédito.
       const disponibleBs = Math.floor(Number(creditoDisponibleUsd ?? 0) * Number(tasa) * 100) / 100;
@@ -707,7 +712,11 @@ function ModalCobro({
               value={nuevo.metodo}
               onChange={(e) => setNuevo({ ...nuevo, metodo: e.target.value as MetodoPago, monto: '' })}
             >
-              {[...LISTA_METODOS, ...(creditoDisponibleUsd !== null ? (['CREDITO'] as const) : [])].map((m) => (
+              {[
+                ...LISTA_METODOS,
+                ...(creditoDisponibleUsd !== null ? (['CREDITO'] as const) : []),
+                ...(clienteId !== null ? (['RETENCION_IVA'] as const) : []),
+              ].map((m) => (
                 <option key={m} value={m}>
                   {METODOS[m].nombre}
                 </option>

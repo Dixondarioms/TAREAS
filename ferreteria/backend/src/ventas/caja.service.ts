@@ -12,7 +12,7 @@ import { AbrirCajaDto, BuscarSesionesDto, CerrarCajaDto, MovimientoCajaDto } fro
 
 export interface ResumenCaja {
   sesion: SesionCaja;
-  ventas: { cantidad: number; anuladas: number; totalBs: string; igtfBs: string; creditoBs: string };
+  ventas: { cantidad: number; anuladas: number; totalBs: string; igtfBs: string; creditoBs: string; retencionesBs: string };
   /** Abonos de clientes a sus deudas, en la moneda del método. */
   abonos: MontosPorMetodo;
   /** Cobrado por método (sin restar vuelto), en la moneda del método. */
@@ -180,10 +180,12 @@ export class CajaService {
       [MetodoPago.EFECTIVO_USD]: dec(sesion.fondoUsd),
     };
     let credito = dec(0);
+    let retenciones = dec(0);
     for (const p of pagos) {
       // Lo fiado no entra a la caja: se informa aparte y no se cuenta al cerrar.
       if (METODOS_FUERA_DE_CAJA.includes(p.metodo as MetodoPago)) {
-        credito = credito.plus(p.monto);
+        if (p.metodo === MetodoPago.CREDITO) credito = credito.plus(p.monto);
+        else retenciones = retenciones.plus(p.monto);
         continue;
       }
       sumar(cobrado, p.metodo, dec(p.monto));
@@ -193,6 +195,15 @@ export class CajaService {
       `SELECT metodo, sum(monto) AS monto FROM abonos_cliente WHERE sesion_id = $1 GROUP BY metodo`,
       [sesion.id],
     );
+    // Notas de débito cobradas en esta caja.
+    const debitos: { metodo: string; monto: string }[] = await m.query(
+      `SELECT metodo, sum(monto) AS monto FROM notas_debito WHERE sesion_id = $1 GROUP BY metodo`,
+      [sesion.id],
+    );
+    for (const d of debitos) {
+      sumar(cobrado, d.metodo, dec(d.monto));
+      sumar(esperado, d.metodo, dec(d.monto));
+    }
     const abonos: Record<string, Dec> = {};
     for (const a of abonosCaja) {
       sumar(abonos, a.metodo, dec(a.monto));
@@ -229,6 +240,7 @@ export class CajaService {
         totalBs: dec(ventas.total).toFixed(2),
         igtfBs: dec(ventas.igtf).toFixed(2),
         creditoBs: credito.toFixed(2),
+        retencionesBs: retenciones.toFixed(2),
       },
       abonos: aTextos(abonos),
       cobrado: aTextos(cobrado),

@@ -2,8 +2,9 @@ import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Post, Que
 import { ApiTags } from '@nestjs/swagger';
 import { Roles, UsuarioActual, UsuarioSesion } from '../comun/decoradores';
 import { Rol } from '../usuarios/rol.enum';
-import { ConsultaMesDto, CrearFacturaCompraDto } from './fiscal.dto';
+import { ConsultaMesDto, ConsultaQuincenaDto, CrearFacturaCompraDto } from './fiscal.dto';
 import { FiscalService } from './fiscal.service';
+import { RetencionesService } from './retenciones.service';
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -11,7 +12,10 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 @Controller('fiscal')
 @Roles(Rol.GERENTE)
 export class FiscalController {
-  constructor(private readonly servicio: FiscalService) {}
+  constructor(
+    private readonly servicio: FiscalService,
+    private readonly retencionesIva: RetencionesService,
+  ) {}
 
   @Post('compras')
   crearCompra(@Body() dto: CrearFacturaCompraDto, @UsuarioActual() u: UsuarioSesion) {
@@ -22,6 +26,26 @@ export class FiscalController {
   @HttpCode(204)
   eliminarCompra(@Param('id', ParseIntPipe) id: number) {
     return this.servicio.eliminarCompra(id);
+  }
+
+  /** Comprobantes de retención de IVA emitidos en el mes. */
+  @Get('retenciones')
+  retenciones(@Query() c: ConsultaMesDto) {
+    return this.retencionesIva.listar(c.mes);
+  }
+
+  @Get('retenciones/txt')
+  async txtRetenciones(@Query() c: ConsultaQuincenaDto) {
+    const q = c.quincena === '2' ? 2 : 1;
+    return new StreamableFile(Buffer.from(await this.retencionesIva.txt(c.mes, q), 'utf8'), {
+      type: 'text/plain; charset=utf-8',
+      disposition: `attachment; filename="retenciones-iva-${c.mes}-q${q}.txt"`,
+    });
+  }
+
+  @Get('compras/:id/comprobante')
+  comprobante(@Param('id', ParseIntPipe) id: number) {
+    return this.retencionesIva.comprobante(id);
   }
 
   @Get('libro-ventas')

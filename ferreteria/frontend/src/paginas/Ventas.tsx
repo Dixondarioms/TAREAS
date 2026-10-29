@@ -26,7 +26,17 @@ import { api } from '../lib/api';
 import { aDecimalApi, bs, fecha, numero } from '../lib/formato';
 import { useSesion } from '../lib/sesion';
 import { Pagina } from '../lib/tipos';
-import { MetodoPago, METODOS, NotaCredito, numeroFactura, numeroNota, simboloMoneda, Venta } from '../lib/ventas';
+import {
+  LISTA_METODOS,
+  MetodoPago,
+  METODOS,
+  NotaCredito,
+  NotaDebito,
+  numeroFactura,
+  numeroNota,
+  simboloMoneda,
+  Venta,
+} from '../lib/ventas';
 
 export function Ventas() {
   const { puede } = useSesion();
@@ -148,10 +158,16 @@ function DetalleVenta({ id, alCerrar }: { id: number | null; alCerrar: () => voi
   const consultas = useQueryClient();
   const [anulando, setAnulando] = useState(false);
   const [devolviendo, setDevolviendo] = useState(false);
+  const [cargando, setCargando] = useState(false);
   const [motivo, setMotivo] = useState('');
   const venta = useQuery({
     queryKey: ['ventas', 'detalle', id],
     queryFn: () => api.get<Venta>(`/ventas/${id}`),
+    enabled: id !== null,
+  });
+  const debitos = useQuery({
+    queryKey: ['ventas', 'notas-debito', id],
+    queryFn: () => api.get<NotaDebito[]>(`/ventas/${id}/notas-debito`),
     enabled: id !== null,
   });
   const notas = useQuery({
@@ -186,7 +202,10 @@ function DetalleVenta({ id, alCerrar }: { id: number | null; alCerrar: () => voi
         <div className="space-y-4">
           <ResumenFactura venta={v} />
           {notas.data && notas.data.length > 0 && <ListaNotas notas={notas.data} />}
-          {devolviendo ? (
+          {debitos.data && debitos.data.length > 0 && <ListaDebitos notas={debitos.data} />}
+          {cargando ? (
+            <FormNotaDebito venta={v} alTerminar={() => setCargando(false)} />
+          ) : devolviendo ? (
             <FormNotaCredito venta={v} notas={notas.data ?? []} alTerminar={() => setDevolviendo(false)} />
           ) : anulando ? (
             <form
@@ -224,6 +243,9 @@ function DetalleVenta({ id, alCerrar }: { id: number | null; alCerrar: () => voi
                 <>
                   <Boton variante="secundario" onClick={() => setDevolviendo(true)}>
                     Nota de crédito
+                  </Boton>
+                  <Boton variante="secundario" onClick={() => setCargando(true)}>
+                    Nota de débito
                   </Boton>
                   <Boton variante="secundario" onClick={() => setAnulando(true)}>
                     Anular
@@ -396,6 +418,117 @@ function FormNotaCredito({ venta, notas, alTerminar }: { venta: Venta; notas: No
             Registrar nota de crédito
           </Boton>
         </div>
+      </div>
+    </form>
+  );
+}
+
+function ListaDebitos({ notas }: { notas: NotaDebito[] }) {
+  return (
+    <div className="space-y-2 border-t border-slate-200 pt-3">
+      <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">Notas de débito</div>
+      {notas.map((n) => (
+        <div key={n.id} className="rounded-lg bg-sky-50/60 p-3 text-sm ring-1 ring-sky-200">
+          <div className="flex flex-wrap justify-between gap-2">
+            <span className="font-medium text-slate-900">
+              N° <span className="cifra">{numeroNota(n)}</span> · control <span className="cifra">{n.numeroControl}</span>
+            </span>
+            <span className="cifra font-semibold text-slate-900">+ {bs(n.totalBs)}</span>
+          </div>
+          <div className="text-xs text-slate-600">
+            {fecha(n.creadoEn)} · {n.concepto} · base {bs(n.baseBs)} + IVA {bs(n.ivaBs)} · cobrado {simboloMoneda(n.metodo)}{' '}
+            {numero(n.monto, 2)} ({METODOS[n.metodo].nombre}){n.usuario && ` · ${n.usuario.nombre}`}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FormNotaDebito({ venta, alTerminar }: { venta: Venta; alTerminar: () => void }) {
+  const avisos = useAvisos();
+  const consultas = useQueryClient();
+  const [form, setForm] = useState({
+    concepto: '',
+    baseBs: '',
+    alicuotaIva: 'GENERAL',
+    metodo: 'EFECTIVO_BS' as MetodoPago,
+    referencia: '',
+  });
+  const crear = useMutation({
+    mutationFn: () =>
+      api.post<NotaDebito>(`/ventas/${venta.id}/notas-debito`, {
+        ...form,
+        baseBs: aDecimalApi(form.baseBs),
+        referencia: form.referencia || undefined,
+      }),
+    onSuccess: (n) => {
+      avisos.exito(`Nota de débito N° ${numeroNota(n)} por ${bs(n.totalBs)}. Llénela en el talonario de notas de débito.`);
+      void consultas.invalidateQueries({ queryKey: ['ventas'] });
+      void consultas.invalidateQueries({ queryKey: ['caja'] });
+      void consultas.invalidateQueries({ queryKey: ['talonarios'] });
+      alTerminar();
+    },
+    onError: avisos.error,
+  });
+  return (
+    <form
+      className="space-y-3 rounded-lg bg-sky-50 p-3 ring-1 ring-sky-200 print:hidden"
+      onSubmit={(e) => {
+        e.preventDefault();
+        crear.mutate();
+      }}
+    >
+      <p className="text-sm text-slate-700">
+        Cargo adicional sobre esta factura (flete, diferencia de precio…). Se cobra en su caja.
+      </p>
+      <Campo
+        etiqueta="Concepto"
+        required
+        minLength={3}
+        value={form.concepto}
+        onChange={(e) => setForm({ ...form, concepto: e.target.value })}
+      />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Campo
+          etiqueta="Monto sin IVA (Bs)"
+          inputMode="decimal"
+          required
+          value={form.baseBs}
+          onChange={(e) => setForm({ ...form, baseBs: e.target.value })}
+        />
+        <Selector etiqueta="IVA" value={form.alicuotaIva} onChange={(e) => setForm({ ...form, alicuotaIva: e.target.value })}>
+          <option value="GENERAL">General</option>
+          <option value="REDUCIDA">Reducida</option>
+          <option value="EXENTO">Exento</option>
+        </Selector>
+        <Selector
+          etiqueta="Cobrar con"
+          value={form.metodo}
+          onChange={(e) => setForm({ ...form, metodo: e.target.value as MetodoPago })}
+        >
+          {LISTA_METODOS.map((m) => (
+            <option key={m} value={m}>
+              {METODOS[m].nombre}
+            </option>
+          ))}
+        </Selector>
+        {METODOS[form.metodo].referencia && (
+          <Campo
+            etiqueta="Referencia"
+            required
+            value={form.referencia}
+            onChange={(e) => setForm({ ...form, referencia: e.target.value })}
+          />
+        )}
+      </div>
+      <div className="flex justify-end gap-2">
+        <Boton variante="fantasma" onClick={alTerminar}>
+          Volver
+        </Boton>
+        <Boton type="submit" cargando={crear.isPending}>
+          Registrar nota de débito
+        </Boton>
       </div>
     </form>
   );

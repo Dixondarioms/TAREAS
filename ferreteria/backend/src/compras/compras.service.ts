@@ -10,6 +10,7 @@ import { hoyEnCaracas } from '../comun/fechas';
 import { Pagina } from '../comun/paginacion';
 import { ConfiguracionService } from '../configuracion/configuracion.service';
 import { FacturaCompra, TipoDocumentoCompra } from '../fiscal/factura-compra.entity';
+import { retenerIva } from '../fiscal/retenciones';
 import { InventarioService } from '../inventario/inventario.service';
 import { TipoMovimiento } from '../inventario/movimiento-inventario.entity';
 import { ProductoProveedor } from '../proveedores/producto-proveedor.entity';
@@ -92,7 +93,7 @@ export class ComprasService {
       if (!vigente) throw new BadRequestException('No hay tasa BCV para esa fecha: indíquela en la compra');
       tasa = vigente.valor;
     }
-    const { alicuotasIva } = await this.configuracion.obtenerTodo();
+    const { alicuotasIva, empresa } = await this.configuracion.obtenerTodo();
 
     const id = await this.ds.transaction(async (m) => {
       const ids = [...new Set(dto.lineas.map((l) => l.productoId))];
@@ -129,6 +130,7 @@ export class ComprasService {
 
       // Libro de compras: siempre en bolívares.
       let facturaCompraId: number | null = null;
+      let retencion = dec(0);
       if (dto.facturaFiscal) {
         const aBs = (v: Dec) => (dto.moneda === 'USD' ? b2(v.times(tasa)) : v);
         const baseGeneralBs = aBs(bases.GENERAL);
@@ -136,24 +138,26 @@ export class ComprasService {
         const exentoBs = aBs(bases.EXENTO);
         const ivaGeneralBs = b2(montoIva(baseGeneralBs, alicuotasIva.GENERAL));
         const ivaReducidaBs = b2(montoIva(baseReducidaBs, alicuotasIva.REDUCIDA));
-        const factura = await m.save(
-          m.create(FacturaCompra, {
-            proveedorId: proveedor.id,
-            tipo: TipoDocumentoCompra.FACTURA,
-            fecha: dto.fecha,
-            numero,
-            numeroControl: dto.numeroControl!.trim(),
-            baseExentaBs: exentoBs.toFixed(2),
-            baseGeneralBs: baseGeneralBs.toFixed(2),
-            ivaGeneralBs: ivaGeneralBs.toFixed(2),
-            baseReducidaBs: baseReducidaBs.toFixed(2),
-            ivaReducidaBs: ivaReducidaBs.toFixed(2),
-            totalBs: exentoBs.plus(baseGeneralBs).plus(ivaGeneralBs).plus(baseReducidaBs).plus(ivaReducidaBs).toFixed(2),
-            notas: 'Registrada desde Compras',
-            usuarioId: usuario.id,
-          }),
-        );
+        const factura = m.create(FacturaCompra, {
+          proveedorId: proveedor.id,
+          tipo: TipoDocumentoCompra.FACTURA,
+          fecha: dto.fecha,
+          numero,
+          numeroControl: dto.numeroControl!.trim(),
+          baseExentaBs: exentoBs.toFixed(2),
+          baseGeneralBs: baseGeneralBs.toFixed(2),
+          ivaGeneralBs: ivaGeneralBs.toFixed(2),
+          baseReducidaBs: baseReducidaBs.toFixed(2),
+          ivaReducidaBs: ivaReducidaBs.toFixed(2),
+          totalBs: exentoBs.plus(baseGeneralBs).plus(ivaGeneralBs).plus(baseReducidaBs).plus(ivaReducidaBs).toFixed(2),
+          notas: 'Registrada desde Compras',
+          usuarioId: usuario.id,
+        });
+        await retenerIva(m, factura, empresa.contribuyenteEspecial, dto.porcentajeRetencion ?? 75);
+        await m.save(factura);
         facturaCompraId = factura.id;
+        // Lo retenido se le paga al SENIAT, no al proveedor: sale de la deuda, en la moneda de la compra.
+        retencion = dto.moneda === 'USD' ? b2(dec(factura.ivaRetenidoBs).div(tasa)) : dec(factura.ivaRetenidoBs);
       }
 
       const compra = await m.save(
@@ -169,7 +173,8 @@ export class ComprasService {
           total: total.toFixed(2),
           condicion: dto.condicion,
           vencimiento: dto.vencimiento ?? dto.fecha,
-          saldo: total.toFixed(2),
+          retencionIva: retencion.toFixed(2),
+          saldo: total.minus(retencion).toFixed(2),
           actualizoCostos: dto.actualizarCostos,
           facturaCompraId,
           notas: dto.notas?.trim() || null,
