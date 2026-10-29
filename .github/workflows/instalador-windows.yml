@@ -15,11 +15,17 @@ on:
 permissions:
   contents: read
 
+# Firma digital (ver ferreteria/instalador-windows/FIRMA.md): certificado de FDP Software en SSL.com eSigner.
+# Secretos del repositorio: FIRMA_USUARIO, FIRMA_CLAVE, FIRMA_CREDENCIAL y FIRMA_TOTP.
+# Se firma en las etiquetas v* y en las ejecuciones manuales; en los PR, o si faltan secretos, se compila sin firmar.
+# Los secretos solo llegan a los pasos que firman, no a npm ni a los demás pasos.
+
 jobs:
   construir:
     runs-on: windows-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      firmado: ${{ steps.firma.outputs.firmar }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,21 +49,94 @@ jobs:
         run: echo "version=$(node -p "require('./ferreteria/backend/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Reunir Node, PostgreSQL y la aplicación
         run: ./ferreteria/instalador-windows/preparar.ps1
+      - name: Decidir si se firma
+        id: firma
+        env:
+          FIRMA_USUARIO: ${{ secrets.FIRMA_USUARIO }}
+          FIRMA_CLAVE: ${{ secrets.FIRMA_CLAVE }}
+          FIRMA_CREDENCIAL: ${{ secrets.FIRMA_CREDENCIAL }}
+          FIRMA_TOTP: ${{ secrets.FIRMA_TOTP }}
+        run: |
+          $faltan = @('FIRMA_USUARIO', 'FIRMA_CLAVE', 'FIRMA_CREDENCIAL', 'FIRMA_TOTP') | Where-Object { -not [Environment]::GetEnvironmentVariable($_) }
+          $motivo = ''
+          if ($env:GITHUB_EVENT_NAME -eq 'pull_request') { $motivo = 'en los PR no se firma (cada firma consume el cupo mensual de eSigner)' }
+          elseif ($faltan) { $motivo = "faltan los secretos $($faltan -join ', ')" }
+          if ($motivo) {
+            'firmar=false' >> $env:GITHUB_OUTPUT
+            Write-Host "::warning::Instalador SIN FIRMAR: $motivo. Ver ferreteria/instalador-windows/FIRMA.md"
+            "## ⚠️ Instalador sin firmar`n`nMotivo: $motivo. Windows mostrará «Editor desconocido». Ver ``ferreteria/instalador-windows/FIRMA.md``.`n" >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            'firmar=true' >> $env:GITHUB_OUTPUT
+          }
+      - name: Descargar CodeSignTool (SSL.com eSigner)
+        if: steps.firma.outputs.firmar == 'true'
+        env:
+          VERSION_CST: '1.3.2'
+          SHA256_CST: '4afc32e8b7f79bbe1de7e4e7049aaad4e0f754357613b9bbec0e3052f06fd36b'
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'CodeSignTool.zip'
+          Invoke-WebRequest "https://github.com/SSLcom/CodeSignTool/releases/download/v$env:VERSION_CST/CodeSignTool-v$env:VERSION_CST-windows.zip" -OutFile $zip -UseBasicParsing
+          $real = (Get-FileHash $zip -Algorithm SHA256).Hash
+          if ($real -ne $env:SHA256_CST) { throw "La suma SHA-256 de CodeSignTool no coincide ($real)" }
+          $carpeta = Join-Path $env:RUNNER_TEMP 'CodeSignTool'
+          Expand-Archive $zip $carpeta
+          "CODESIGNTOOL=$carpeta" >> $env:GITHUB_ENV
+      # node.exe ya viene firmado por OpenJS Foundation; WinSW no viene firmado y es el programa que corre como servicio.
+      - name: Firmar WinSW
+        if: steps.firma.outputs.firmar == 'true'
+        env:
+          FIRMA_USUARIO: ${{ secrets.FIRMA_USUARIO }}
+          FIRMA_CLAVE: ${{ secrets.FIRMA_CLAVE }}
+          FIRMA_CREDENCIAL: ${{ secrets.FIRMA_CREDENCIAL }}
+          FIRMA_TOTP: ${{ secrets.FIRMA_TOTP }}
+        run: ./ferreteria/instalador-windows/firmar.ps1 ferreteria/instalador-windows/dist/app/servicio/winsw.exe
       - name: Compilar el instalador (Inno Setup)
         working-directory: ferreteria/instalador-windows
+        env:
+          FIRMAR: ${{ steps.firma.outputs.firmar }}
+          FIRMA_USUARIO: ${{ steps.firma.outputs.firmar == 'true' && secrets.FIRMA_USUARIO || '' }}
+          FIRMA_CLAVE: ${{ steps.firma.outputs.firmar == 'true' && secrets.FIRMA_CLAVE || '' }}
+          FIRMA_CREDENCIAL: ${{ steps.firma.outputs.firmar == 'true' && secrets.FIRMA_CREDENCIAL || '' }}
+          FIRMA_TOTP: ${{ steps.firma.outputs.firmar == 'true' && secrets.FIRMA_TOTP || '' }}
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) {
             choco install innosetup --no-progress -y
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
-          & $iscc "/DVersionApp=${{ steps.version.outputs.version }}" instalador.iss
+          $argumentos = @("/DVersionApp=${{ steps.version.outputs.version }}")
+          if ($env:FIRMAR -eq 'true') {
+            # Inno Setup firma el instalador y el desinstalador llamando a firmar.ps1 ($f = archivo, $q = comillas).
+            $argumentos += '/DFirmar', ('/Sfirma=powershell.exe -NoProfile -ExecutionPolicy Bypass -File $q' + (Join-Path $PWD 'firmar.ps1') + '$q $f')
+          }
+          & $iscc @argumentos instalador.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Get-ChildItem salida | Format-Table Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } }
+      - name: Verificar la firma
+        if: steps.firma.outputs.firmar == 'true'
+        working-directory: ferreteria/instalador-windows
+        run: |
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
+          "## ✅ Instalador firmado`n`n| Archivo | Firmante | Sello de tiempo |`n|---|---|---|" >> $env:GITHUB_STEP_SUMMARY
+          foreach ($exe in @(Get-ChildItem salida\*.exe) + @(Get-Item dist\app\servicio\winsw.exe)) {
+            & $signtool.FullName verify /pa /tw /v $exe.FullName
+            if ($LASTEXITCODE -ne 0) { throw "signtool verify falló para $($exe.Name)" }
+            $firma = Get-AuthenticodeSignature $exe.FullName
+            if ($firma.Status -ne 'Valid' -or -not $firma.TimeStamperCertificate) { throw "Firma inválida o sin sello de tiempo: $($exe.Name) ($($firma.Status))" }
+            "| $($exe.Name) | $($firma.SignerCertificate.Subject) | $($firma.TimeStamperCertificate.Subject) |" >> $env:GITHUB_STEP_SUMMARY
+          }
+      - name: Sumas SHA-256
+        working-directory: ferreteria/instalador-windows/salida
+        run: |
+          $lineas = Get-ChildItem *.exe | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name }
+          [IO.File]::WriteAllText((Join-Path $PWD 'SHA256SUMS.txt'), ($lineas -join "`n") + "`n")
+          "`n### SHA-256`n`n``````text`n$($lineas -join "`n")`n```````n" >> $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v4
         with:
           name: instalador-windows
-          path: ferreteria/instalador-windows/salida/*.exe
+          path: |
+            ferreteria/instalador-windows/salida/*.exe
+            ferreteria/instalador-windows/salida/SHA256SUMS.txt
           if-no-files-found: error
 
   probar:
@@ -72,7 +151,7 @@ jobs:
       - name: Instalar, usar, actualizar y desinstalar
         run: |
           $exe = (Get-ChildItem instalador\*.exe | Select-Object -First 1).FullName
-          ./ferreteria/instalador-windows/probar.ps1 -Instalador $exe
+          ./ferreteria/instalador-windows/probar.ps1 -Instalador $exe -ExigirFirma:$${{ needs.construir.outputs.firmado == 'true' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -90,16 +169,26 @@ jobs:
         with:
           name: instalador-windows
           path: instalador
+      - name: Comprobar las sumas SHA-256
+        working-directory: instalador
+        run: sha256sum -c SHA256SUMS.txt
       - name: Crear la versión con el instalador
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.construir.outputs.version }}
+          FIRMADO: ${{ needs.construir.outputs.firmado }}
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             ETIQUETA="${GITHUB_REF#refs/tags/}"; EXTRA=""
           else
             ETIQUETA="instalador-$VERSION-$GITHUB_RUN_NUMBER"; EXTRA="--prerelease"
           fi
-          gh release create "$ETIQUETA" instalador/*.exe --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" $EXTRA \
+          NOTAS="Descargue el archivo .exe y ejecútelo como administrador en el equipo que será el servidor de la tienda."
+          if [[ "$FIRMADO" == "true" ]]; then
+            NOTAS="$NOTAS Está firmado digitalmente por FDP Software: Windows debe mostrar «Editor comprobado: FDP Software». Puede comprobar el archivo con SHA256SUMS.txt (ver el README)."
+          else
+            NOTAS="$NOTAS Esta versión NO está firmada digitalmente: Windows mostrará «Windows protegió su PC» con «Editor desconocido». Compruebe antes la suma SHA-256 con SHA256SUMS.txt (ver el README); si coincide, pulse «Más información» y luego «Ejecutar de todas formas»."
+          fi
+          gh release create "$ETIQUETA" instalador/*.exe instalador/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" $EXTRA \
             --title "La Casa del Inyector $VERSION — instalador para Windows" \
-            --notes "Descargue el archivo .exe y ejecútelo como administrador en el equipo que será el servidor de la tienda. Si Windows muestra «Windows protegió su PC», pulse «Más información» y luego «Ejecutar de todas formas»."
+            --notes "$NOTAS"

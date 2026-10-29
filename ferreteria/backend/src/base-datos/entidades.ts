@@ -7,11 +7,24 @@ import { PrecioProducto } from '../catalogo/entidades/precio-producto.entity';
 import { Presentacion } from '../catalogo/entidades/presentacion.entity';
 import { Producto } from '../catalogo/entidades/producto.entity';
 import { UnidadMedida } from '../catalogo/entidades/unidad-medida.entity';
+import { Compra, CompraLinea, PagoProveedor } from '../compras/compra.entity';
+import { OrdenCompra, OrdenCompraLinea } from '../compras/orden-compra.entity';
 import { Parametro } from '../configuracion/parametro.entity';
+import { FacturaCompra } from '../fiscal/factura-compra.entity';
+import { MovimientoInventario } from '../inventario/movimiento-inventario.entity';
 import { ProductoProveedor } from '../proveedores/producto-proveedor.entity';
 import { Proveedor } from '../proveedores/proveedor.entity';
 import { TasaCambio } from '../tasas/tasa-cambio.entity';
 import { Usuario } from '../usuarios/usuario.entity';
+import { Cliente } from '../ventas/entidades/cliente.entity';
+import { AbonoCliente, AplicacionAbono, CuentaCobrar } from '../ventas/entidades/cuenta-cobrar.entity';
+import { FacturaAnulada } from '../ventas/entidades/factura-anulada.entity';
+import { MovimientoCaja } from '../ventas/entidades/movimiento-caja.entity';
+import { NotaCredito, NotaCreditoLinea } from '../ventas/entidades/nota-credito.entity';
+import { NotaDebito } from '../ventas/entidades/nota-debito.entity';
+import { SesionCaja } from '../ventas/entidades/sesion-caja.entity';
+import { Talonario } from '../ventas/entidades/talonario.entity';
+import { Venta, VentaLinea, VentaPago } from '../ventas/entidades/venta.entity';
 
 export const ENTIDADES = [
   Usuario,
@@ -28,4 +41,25 @@ export const ENTIDADES = [
   HistorialCosto,
   Proveedor,
   ProductoProveedor,
+  MovimientoInventario,
+  Cliente,
+  Talonario,
+  FacturaAnulada,
+  SesionCaja,
+  MovimientoCaja,
+  Venta,
+  VentaLinea,
+  VentaPago,
+  NotaCredito,
+  NotaCreditoLinea,
+  NotaDebito,
+  FacturaCompra,
+  Compra,
+  CompraLinea,
+  PagoProveedor,
+  OrdenCompra,
+  OrdenCompraLinea,
+  CuentaCobrar,
+  AbonoCliente,
+  AplicacionAbono,
 ];

@@ -68,8 +68,37 @@ export interface ProductoListado {
   alicuotaIva: AlicuotaIva;
   ubicacion: string | null;
   activo: boolean;
+  existencia: string;
+  stockMinimo: string;
   costoUsd?: string;
   precio: (VistaPrecio & { listaId: number; margen?: string | null; modo?: ModoPrecio }) | null;
+}
+
+export type TipoMovimiento = 'ENTRADA' | 'SALIDA' | 'MERMA' | 'CONTEO' | 'COMPRA' | 'VENTA' | 'DEVOLUCION';
+
+export interface MovimientoInventario {
+  id: number;
+  tipo: TipoMovimiento;
+  cantidad: string;
+  existenciaResultante: string;
+  costoUsd?: string;
+  motivo: string;
+  referencia: string | null;
+  usuario: string | null;
+  creadoEn: string;
+}
+
+export interface ResumenInventario {
+  productosActivos: number;
+  bajoMinimo: number;
+  sinExistencia: number;
+  valorUsd?: string;
+}
+
+export interface ResultadoConteo {
+  referencia: string;
+  ajustados: number;
+  lineas: { productoId: number; codigo: string; descripcion: string; anterior: string; contado: string; diferencia: string }[];
 }
 
 export interface ResultadoBusqueda extends Pagina<ProductoListado> {
@@ -87,6 +116,7 @@ export interface ProductoDetalle {
   unidadBase: Unidad;
   alicuotaIva: AlicuotaIva;
   porcentajeIva: string;
+  existencia: string;
   stockMinimo: string;
   stockMaximo: string | null;
   ubicacion: string | null;

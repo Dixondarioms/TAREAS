@@ -2,7 +2,7 @@
 
 Software de gestión de **La Casa del Inyector San Juan, C.A.**, ferretería pequeña o mediana en Venezuela, pensado para **instalarse en un servidor dentro de la tienda** y funcionar aunque falle internet.
 
-Esta versión corresponde a la **fase 1** del plan: catálogo, precios en dos monedas y tasa BCV.
+Esta versión incluye las **fases 1 a 6** del plan: catálogo, precios en dos monedas, tasa BCV, inventario, punto de venta, caja, facturación por talonario, notas de crédito, libros fiscales, compras, cuentas por pagar, crédito a clientes y reportes.
 
 | Módulo | Qué hace |
 |---|---|
@@ -15,6 +15,20 @@ Esta versión corresponde a la **fase 1** del plan: catálogo, precios en dos mo
 | Importación | Carga o actualización del catálogo desde Excel (.xlsx) o CSV, con revisión previa y reporte de errores por fila. |
 | Proveedores | Ficha con RIF validado (dígito verificador del SENIAT) y códigos y costos por producto. |
 | Búsqueda | Por palabras, sin importar acentos, por código o código de barras, y tolerante a errores de tipeo («tornilo»). |
+| Inventario | Existencia por producto y kardex de cada movimiento (nunca se modifica). Ajustes de entrada, salida y merma con motivo, conteo físico con lector de código de barras, alertas de productos bajo el mínimo o sin existencia y valor del inventario al costo. La existencia inicial se puede cargar desde Excel. |
+| Punto de venta | Venta con lector de código de barras, por unidad o presentación y con lista de precios. Factura en Bs a la tasa BCV, IVA por alícuota, pagos mixtos (efectivo Bs y USD, pago móvil, transferencia, punto de venta, Zelle, Binance) y vuelto en Bs o USD. Si la empresa es contribuyente especial suma el IGTF (3 %) sobre lo pagado en divisas. Descuenta el inventario. |
+| Facturación por talonario | Registro de los talonarios de la imprenta: el sistema asigna cada número de factura y de control en orden, sin saltos. Hojas dañadas se anulan con motivo. Resumen imprimible para copiar la factura. Sin talonario disponible no se puede vender. |
+| Caja | Apertura con fondo en Bs y USD, retiros, gastos e ingresos de efectivo, y cierre con arqueo por método de pago (esperado, contado y diferencia). Anulación de ventas mientras la caja sigue abierta. |
+| Notas de crédito | Devolución total o parcial de una factura, con su propio talonario y correlativo. Se calcula con la tasa y el IVA de la factura original, el reintegro sale de la caja abierta (efectivo Bs o USD, o pago móvil) y la mercancía vuelve al inventario salvo que llegue dañada. |
+| Libros fiscales | Libro de ventas (facturas, notas de crédito en negativo, facturas y hojas anuladas) y libro de compras del mes, con exportación a Excel, y resumen de débito y crédito fiscal para la declaración de IVA. Las facturas de proveedores se registran con sus montos en Bs y se valida que el IVA corresponda a la base. |
+| Compras | Recepción de mercancía con la factura o nota de entrega del proveedor, en Bs o USD: entra al inventario, actualiza el costo de reposición (y los precios por margen) y el costo por proveedor, y registra la factura en el libro de compras. Gerencia puede anular una compra registrada por error (sin pagos y con la mercancía aún en existencia): sale del inventario, el costo vuelve al anterior y deja el libro de compras. |
+| Órdenes de compra | Pedido imprimible al proveedor, armado a mano o con «Sugerir por mínimos» (productos del proveedor bajo el mínimo, hasta la existencia máxima, descontando lo ya pedido). Al llegar la mercancía se recibe desde la orden con lo pendiente ya cargado; la orden queda recibida en parte o completa, o se cancela. |
+| Cuentas por pagar | Saldo de cada compra en su moneda, abonos con método y referencia, y vencimientos con aviso de las vencidas. |
+| Clientes | Cédula o RIF validado (solo números se toman como cédula V-), nombre o razón social y dirección fiscal; sin cliente la factura sale a «Consumidor final». |
+| Retenciones de IVA | Si la empresa es agente de retención (contribuyente especial), cada factura de proveedor retiene el 75 % (o 100 %) del IVA, emite el comprobante numerado AAAAMM + 8 dígitos (imprimible), descuenta la retención de lo que se le debe al proveedor y genera el archivo TXT por quincena para el portal del SENIAT. Las retenciones que hacen los clientes agentes se cobran con el método «Retención de IVA» (con su número de comprobante), van al libro de ventas y se restan de la cuota. |
+| Notas de débito | Cargo adicional sobre una factura (flete, diferencia de precio), con su propio talonario; se cobra en caja y va al libro de ventas. |
+| Crédito a clientes | Límite en USD y días de plazo por cliente (lo asigna gerencia). Venta fiada total o parcial desde el punto de venta; la deuda se lleva en USD a la tasa de la factura. Abonos en cualquier moneda a la tasa del día, que entran a la caja y pagan primero lo que vence antes. Una nota de crédito de una venta fiada se descuenta de la deuda. |
+| Reportes | Ventas netas, ganancia bruta y margen en USD, facturado por día, cobrado por método, ventas por cajero y productos más vendidos, para cualquier período. |
 | Respaldos | Copia diaria automática de la base de datos y script de restauración. |
 
 ## Arquitectura
@@ -42,9 +56,11 @@ Esta versión corresponde a la **fase 1** del plan: catálogo, precios en dos mo
 
 Es la forma más sencilla: un solo archivo instala todo. Incluye la base de datos PostgreSQL, la aplicación, los respaldos diarios y el acceso desde la red. No necesita Docker ni internet para funcionar.
 
-1. Descargue `Instalador-LaCasaDelInyector-X.Y.Z.exe` desde la página **Releases** del repositorio.
+1. Descargue `Instalador-LaCasaDelInyector-X.Y.Z.exe` desde la página **Releases** del repositorio. Junto a él está `SHA256SUMS.txt`, para comprobar que el archivo llegó completo y sin cambios (ver [Verificar el instalador](#verificar-el-instalador)).
 2. Ejecútelo en la computadora que será el servidor de la tienda (Windows 10 u 11 de 64 bits). Pedirá permiso de administrador.
-   - Si aparece «Windows protegió su PC», pulse **Más información** y luego **Ejecutar de todas formas**. Ocurre porque el instalador no está firmado digitalmente.
+   - Las versiones firmadas digitalmente (lo indica la página de la versión) muestran en la ventana de permiso de administrador **Editor comprobado: FDP Software**. Si dice «Editor: Desconocido», **no lo ejecute** y descárguelo otra vez desde Releases.
+   - En las primeras semanas con un certificado nuevo, Windows todavía puede mostrar «Windows protegió su PC» mientras el instalador gana reputación. Pulse **Más información** y continúe con **Ejecutar de todas formas** solo si allí aparece «Editor: FDP Software».
+   - Las versiones anteriores a la firma, y las que la página de la versión indique «sin firmar», muestran siempre ese aviso con «Editor: Desconocido»; en ese caso compruebe el SHA-256 antes de ejecutarlo.
 3. Al terminar, el asistente muestra:
    - la dirección para entrar desde las demás computadoras, por ejemplo `http://192.168.1.50/`;
    - el usuario `admin` y su **clave inicial**. Anótela y cámbiela al entrar.
@@ -57,12 +73,33 @@ Es la forma más sencilla: un solo archivo instala todo. Incluye la base de dato
 | Servicios de Windows | `LCI-BaseDatos` y `LCI-API`, con inicio automático |
 | Respaldo diario | Tarea programada a las 23:00. Si el equipo estaba apagado, se hace al encenderlo. |
 
-- En el menú Inicio, bajo **La Casa del Inyector**, están la carpeta de respaldos, **Restaurar un respaldo** y los registros de diagnóstico.
+- En el menú Inicio, bajo **La Casa del Inyector**, están la carpeta de respaldos, **Restaurar un respaldo** y los registros de diagnóstico, además de:
+  - **Copia de respaldos fuera del equipo:** elija un disco externo, un pendrive o una carpeta de OneDrive o Google Drive. Cada respaldo se copia también allí, y se conservan los mismos días que en el servidor. Si el disco no está conectado a la hora del respaldo, solo se omite la copia de ese día y queda un aviso en `respaldos.log`.
+  - **Restablecer clave del administrador:** si se pierde la clave del usuario `admin`, genera una nueva y la muestra en pantalla. Pide permiso de administrador de Windows.
 - **Actualizar:** ejecute el `.exe` de la nueva versión. Antes de actualizar se hace un respaldo automático y los datos se conservan.
 - **Desinstalar:** desde «Agregar o quitar programas». Los datos se conservan, y si vuelve a instalar se recuperan.
 - Mantenga ese equipo encendido mientras la tienda trabaje. Configure Windows para que **no entre en suspensión**.
 
-El instalador se compila y se prueba automáticamente en un Windows real con GitHub Actions (`.github/workflows/instalador-windows.yml`). Para publicar una versión nueva en Releases, cree una etiqueta `vX.Y.Z` o ejecute el flujo manualmente con «Publicar».
+El instalador se compila y se prueba automáticamente en un Windows real con GitHub Actions (`.github/workflows/instalador-windows.yml`). Para publicar una versión nueva en Releases, cree una etiqueta `vX.Y.Z` o ejecute el flujo manualmente con «Publicar». La firma digital se hace en ese mismo flujo; qué certificado hace falta y cómo configurarlo está en [`instalador-windows/FIRMA.md`](instalador-windows/FIRMA.md).
+
+### Verificar el instalador
+
+**Firma digital.** Clic derecho sobre el `.exe` → **Propiedades** → pestaña **Firmas digitales**: debe aparecer *FDP Software* y, en **Detalles**, «Esta firma digital es correcta». O en PowerShell:
+
+```powershell
+Get-AuthenticodeSignature .\Instalador-LaCasaDelInyector-X.Y.Z.exe | Format-List Status, SignerCertificate, TimeStamperCertificate
+```
+
+`Status` debe ser `Valid` y el firmante debe ser `FDP Software` (en `SignerCertificate`, campo `CN=` u `O=`). Si la pestaña no existe o el estado es otro, el archivo no está firmado o fue modificado: no lo ejecute.
+
+**Suma SHA-256.** Compare la suma del archivo descargado con la línea correspondiente de `SHA256SUMS.txt` de la misma versión:
+
+```powershell
+(Get-FileHash .\Instalador-LaCasaDelInyector-X.Y.Z.exe -Algorithm SHA256).Hash
+Get-Content .\SHA256SUMS.txt
+```
+
+Las dos sumas deben ser iguales (sin importar mayúsculas y minúsculas).
 
 ## Instalación en un servidor Linux con Docker
 
@@ -144,13 +181,14 @@ Para restaurar un respaldo (reemplaza **todos** los datos actuales):
 - La API consulta `https://www.bcv.org.ve/` cada 2 horas, de 8:00 a 20:00, hora de Venezuela.
 - Si la lectura difiere más de 50 % de la tasa vigente, se descarta por seguridad y queda registrada en el log.
 - Sin internet, el gerente puede cargar la tasa a mano en **Tasa de cambio**.
-- **Certificado del BCV.** El sitio del BCV a veces publica su certificado sin la cadena intermedia. La consulta falla entonces con `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. Para resolverlo:
+- Si la consulta falla, el log de la API indica el motivo, por ejemplo «no se encontró el servidor (¿hay internet?) (ENOTFOUND)».
+- **Certificado del BCV.** El sitio del BCV a veces envía su certificado sin la cadena intermedia (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`). La API lo resuelve sola, igual que los navegadores: descarga el certificado intermedio desde la dirección «CA Issuers» del propio certificado. Solo lo acepta si es el que firmó el certificado del BCV, y la cadena completa debe llegar a una autoridad raíz de confianza. No se desactiva la verificación TLS.
+
+  Si en algún momento esa descarga tampoco funciona (por ejemplo, porque la red bloquea `crt.sectigo.com`), puede darle el intermedio a mano:
   1. Descargue el certificado intermedio de la autoridad que firmó el del BCV.
   2. Guárdelo como `certificados/bcv.pem`.
   3. Descomente `NODE_EXTRA_CA_CERTS=/certificados/bcv.pem` en `.env`.
   4. Reinicie con `docker compose up -d`.
-
-  No se desactiva la verificación TLS.
 
 ## Roles y permisos
 
@@ -160,6 +198,18 @@ Para restaurar un respaldo (reemplaza **todos** los datos actuales):
 | Ver costos y márgenes | ✓ | ✓ | ✓ | — |
 | Crear y editar productos, categorías, marcas y proveedores | ✓ | ✓ | ✓ | — |
 | Modificar costos y precios, ajuste masivo, importación | ✓ | ✓ | — | — |
+| Consultar existencias y kardex | ✓ | ✓ | ✓ | ✓ (sin costos) |
+| Ajustes de inventario y conteo físico | ✓ | ✓ | ✓ | — |
+| Vender, abrir y cerrar su caja, anular sus ventas (con la caja abierta) | ✓ | ✓ | — | ✓ |
+| Ver todas las ventas y el historial de cajas | ✓ | ✓ | — | — (solo las suyas) |
+| Notas de crédito de sus ventas (reintegro desde su caja) | ✓ | ✓ | — | ✓ |
+| Registrar o retirar talonarios | ✓ | ✓ | — | — |
+| Libros fiscales y facturas de compra | ✓ | ✓ | — | — |
+| Registrar compras (recepción) y órdenes de compra | ✓ | ✓ | ✓ (sin actualizar costos) | — |
+| Anular compras registradas por error | ✓ | ✓ | — | — |
+| Cuentas por pagar y pagos a proveedores | ✓ | ✓ | — | — |
+| Vender fiado (dentro del límite) y recibir abonos | ✓ | ✓ | — | ✓ |
+| Asignar crédito, ver cuentas por cobrar y reportes | ✓ | ✓ | — | — |
 | Cargar o consultar la tasa BCV | ✓ | ✓ | — | — |
 | Usuarios y configuración | ✓ | — | — | — |
 
@@ -223,7 +273,4 @@ DB_NOMBRE_PRUEBAS=ferreteria_test npm run test:e2e
 
 ## Próximas fases
 
-1. **Inventario:** kardex, existencias, ajustes, conteo físico y alertas de mínimos.
-2. **Punto de venta y caja:** pagos mixtos (Bs, USD, Pago Móvil, punto de venta, Zelle), vuelto y cierre de caja por moneda.
-3. **Módulo fiscal:** máquina fiscal o imprenta digital, IVA, IGTF y notas de crédito, según lo que defina el contador.
-4. **Compras, crédito a clientes, libros de compras y ventas, retenciones y reportes.**
+1. **Imprenta digital**, si el negocio migra a ese esquema según lo que defina el contador.

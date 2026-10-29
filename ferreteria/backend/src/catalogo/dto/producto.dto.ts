@@ -187,4 +187,9 @@ export class BuscarProductosDto extends ConsultaPaginada {
   @IsOptional()
   @IsIn(['activos', 'inactivos', 'todos'])
   estado?: 'activos' | 'inactivos' | 'todos';
+
+  /** bajo-minimo: existencia igual o menor al mínimo (si tiene mínimo definido). */
+  @IsOptional()
+  @IsIn(['bajo-minimo', 'sin-existencia', 'con-existencia'])
+  existencia?: 'bajo-minimo' | 'sin-existencia' | 'con-existencia';
 }

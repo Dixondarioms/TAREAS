@@ -175,7 +175,7 @@ export function Encabezado({ titulo, descripcion, acciones }: { titulo: string; 
         <h1 className="text-xl font-semibold text-slate-900">{titulo}</h1>
         {descripcion && <p className="mt-0.5 text-sm text-slate-500">{descripcion}</p>}
       </div>
-      {acciones && <div className="flex flex-wrap gap-2">{acciones}</div>}
+      {acciones && <div className="flex flex-wrap gap-2 print:hidden">{acciones}</div>}
     </div>
   );
 }
@@ -241,14 +241,14 @@ export function Modal({
   if (!abierto) return null;
   return (
     <div
-      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:items-center"
+      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:items-center print:static print:block print:bg-white print:p-0"
       onMouseDown={alCerrar}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        className={clases('w-full rounded-xl bg-white shadow-xl', ancho)}
+        className={clases('w-full rounded-xl bg-white shadow-xl print:max-w-none print:shadow-none', ancho)}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
@@ -256,7 +256,7 @@ export function Modal({
           <button
             type="button"
             onClick={alCerrar}
-            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 print:hidden"
             aria-label="Cerrar"
           >
             <X className="size-5" />

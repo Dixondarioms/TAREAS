@@ -4,13 +4,18 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { opcionesBaseDatos } from './base-datos/opciones';
 import { CatalogoModule } from './catalogo/catalogo.module';
+import { ComprasModule } from './compras/compras.module';
 import { leerConfiguracion } from './configuracion-app';
 import { ConfiguracionModule } from './configuracion/configuracion.module';
+import { FiscalModule } from './fiscal/fiscal.module';
+import { InventarioModule } from './inventario/inventario.module';
 import { ProveedoresModule } from './proveedores/proveedores.module';
+import { ReportesModule } from './reportes/reportes.module';
 import { SaludController } from './salud.controller';
 import { SemillasModule } from './semillas/semillas.module';
 import { TasasModule } from './tasas/tasas.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { VentasModule } from './ventas/ventas.module';
 
 @Module({
   imports: [
@@ -22,6 +27,11 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     TasasModule,
     CatalogoModule,
     ProveedoresModule,
+    InventarioModule,
+    VentasModule,
+    FiscalModule,
+    ComprasModule,
+    ReportesModule,
     SemillasModule,
   ],
   controllers: [SaludController],

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Package, Percent, Upload } from 'lucide-react';
+import { Boxes, ClipboardList, Package, Percent, Upload } from 'lucide-react';
 import { Link } from 'react-router';
 import { TarjetaTasas } from '../componentes/TarjetaTasas';
 import { Encabezado, Tarjeta } from '../componentes/ui';
@@ -7,7 +7,8 @@ import { api } from '../lib/api';
 import { useConfiguracion } from '../lib/consultas';
 import { RAZON_SOCIAL } from '../lib/marca';
 import { useSesion } from '../lib/sesion';
-import { ResultadoBusqueda } from '../lib/tipos';
+import { numero } from '../lib/formato';
+import { ResultadoBusqueda, ResumenInventario } from '../lib/tipos';
 
 export function Inicio() {
   const { usuario, puede } = useSesion();
@@ -16,6 +17,11 @@ export function Inicio() {
     queryKey: ['productos', 'conteo'],
     queryFn: () => api.get<ResultadoBusqueda>('/productos', { porPagina: 1 }),
   });
+  const inventario = useQuery({
+    queryKey: ['inventario', 'resumen'],
+    queryFn: () => api.get<ResumenInventario>('/inventario/resumen'),
+  });
+  const inv = inventario.data;
 
   return (
     <>
@@ -39,8 +45,40 @@ export function Inicio() {
             )}
           </div>
         </Tarjeta>
+        <Tarjeta titulo="Inventario" className="lg:col-span-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Cifra
+              valor={inv ? numero(inv.bajoMinimo, 0) : '…'}
+              texto="productos en el mínimo o por debajo"
+              tono={inv && inv.bajoMinimo > 0 ? 'text-amber-700' : 'text-slate-900'}
+            />
+            <Cifra
+              valor={inv ? numero(inv.sinExistencia, 0) : '…'}
+              texto="productos sin existencia"
+              tono={inv && inv.sinExistencia > 0 ? 'text-red-700' : 'text-slate-900'}
+            />
+            {inv?.valorUsd !== undefined && (
+              <Cifra valor={`$ ${numero(inv.valorUsd, 2)}`} texto="valor del inventario al costo" />
+            )}
+            <div className="flex flex-col gap-2 text-sm">
+              <Atajo a="/inventario" icono={<Boxes className="size-4" />} texto="Ver inventario" />
+              {puede('GERENTE', 'ALMACEN') && (
+                <Atajo a="/inventario/conteo" icono={<ClipboardList className="size-4" />} texto="Hacer un conteo físico" />
+              )}
+            </div>
+          </div>
+        </Tarjeta>
       </div>
     </>
+  );
+}
+
+function Cifra({ valor, texto, tono = 'text-slate-900' }: { valor: string; texto: string; tono?: string }) {
+  return (
+    <div>
+      <div className={`cifra text-3xl font-semibold whitespace-nowrap ${tono}`}>{valor}</div>
+      <p className="text-sm text-slate-500">{texto}</p>
+    </div>
   );
 }
 

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { InventarioModule } from '../inventario/inventario.module';
 import { TasasModule } from '../tasas/tasas.module';
 import { CategoriasController, ListasPrecioController, MarcasController, UnidadesController } from './catalogo-basico.controller';
 import { CatalogoBasicoService } from './catalogo-basico.service';
@@ -8,7 +9,7 @@ import { PreciosController, ProductosController } from './productos.controller';
 import { ProductosService } from './productos.service';
 
 @Module({
-  imports: [TasasModule],
+  imports: [TasasModule, InventarioModule],
   controllers: [
     UnidadesController,
     CategoriasController,

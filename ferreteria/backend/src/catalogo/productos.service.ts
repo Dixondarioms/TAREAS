@@ -32,6 +32,8 @@ export interface ProductoListado {
   alicuotaIva: string;
   ubicacion: string | null;
   activo: boolean;
+  existencia: string;
+  stockMinimo: string;
   costoUsd?: string;
   precio: (VistaPrecio & { listaId: number; margen?: string | null; modo?: ModoPrecio }) | null;
 }
@@ -107,6 +109,8 @@ export class ProductosService {
           alicuotaIva: p.alicuotaIva,
           ubicacion: p.ubicacion,
           activo: p.activo,
+          existencia: p.existencia,
+          stockMinimo: p.stockMinimo,
           precio: precio
             ? {
                 listaId: lista.id,
@@ -145,6 +149,9 @@ export class ProductosService {
     const condiciones: string[] = [];
     const estado = c.estado ?? 'activos';
     if (estado !== 'todos') condiciones.push(`p.activo = ${estado === 'activos'}`);
+    if (c.existencia === 'bajo-minimo') condiciones.push(`p.stock_minimo > 0 AND p.existencia <= p.stock_minimo`);
+    if (c.existencia === 'sin-existencia') condiciones.push(`p.existencia = 0`);
+    if (c.existencia === 'con-existencia') condiciones.push(`p.existencia > 0`);
     if (c.marcaId) condiciones.push(`p.marca_id = ${p(c.marcaId)}`);
     if (c.proveedorId) {
       condiciones.push(
@@ -234,6 +241,7 @@ export class ProductosService {
       unidadBase: p.unidadBase,
       alicuotaIva: p.alicuotaIva,
       porcentajeIva: ctx.alicuotas[p.alicuotaIva],
+      existencia: p.existencia,
       stockMinimo: p.stockMinimo,
       stockMaximo: p.stockMaximo,
       ubicacion: p.ubicacion,
@@ -352,6 +360,11 @@ export class ProductosService {
         producto.codigo = codigo;
       }
       await this.validarReferencias(m, { ...producto, ...dto });
+      if (dto.unidadBaseId !== undefined && dto.unidadBaseId !== producto.unidadBaseId && !dec(producto.existencia).isZero()) {
+        throw new BadRequestException(
+          'El producto tiene existencia: para cambiar la unidad base, primero lleve la existencia a cero con un ajuste de inventario',
+        );
+      }
       if (dto.unidadBaseId !== undefined && dto.presentaciones === undefined) {
         const choca = await m.existsBy(Presentacion, { productoId: id, unidadId: dto.unidadBaseId });
         if (choca) throw new BadRequestException('Una presentación del producto ya usa esa unidad; ajuste las presentaciones');

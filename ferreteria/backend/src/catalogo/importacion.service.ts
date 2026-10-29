@@ -17,6 +17,8 @@ import { AlicuotaIva, Producto } from './entidades/producto.entity';
 import { UnidadMedida } from './entidades/unidad-medida.entity';
 import { FilaPlanilla, leerPlanilla, normalizarNumero } from './lectura-planilla';
 import { calcularFilaPrecio, normalizarCodigo, ProductosService } from './productos.service';
+import { InventarioService } from '../inventario/inventario.service';
+import { TipoMovimiento } from '../inventario/movimiento-inventario.entity';
 
 export const MAX_FILAS_IMPORTACION = 20_000;
 
@@ -85,6 +87,7 @@ export class ImportacionService {
   constructor(
     @InjectDataSource() private readonly ds: DataSource,
     private readonly productos: ProductosService,
+    private readonly inventario: InventarioService,
   ) {}
 
   async plantilla(): Promise<Buffer> {
@@ -103,6 +106,7 @@ export class ImportacionService {
       'stock_minimo',
       'stock_maximo',
       'ubicacion',
+      'existencia',
       'proveedor_rif',
       'codigo_proveedor',
       ...listas.flatMap((l) => [`margen_${l.codigo.toLowerCase()}`, `precio_${l.codigo.toLowerCase()}`]),
@@ -120,6 +124,7 @@ export class ImportacionService {
       '200',
       '2000',
       'P3-E2',
+      '1500',
       '',
       'FX-614',
       ...listas.flatMap((l) => [l.margenPorDefecto, '']),
@@ -137,6 +142,10 @@ export class ImportacionService {
       ['costo_usd', 'Costo en USD por unidad base, sin IVA. Acepta 1.234,56 o 1234.56'],
       ['iva', 'GENERAL (16), REDUCIDA (8) o EXENTO (0). Por defecto GENERAL.'],
       ['codigo_barras', 'Uno o varios separados por "|". Se agregan a los existentes.'],
+      [
+        'existencia',
+        'Opcional. Cantidad contada en unidad base. Si difiere de la del sistema, se registra un ajuste de conteo en el kardex.',
+      ],
       ['proveedor_rif / codigo_proveedor', 'RIF de un proveedor ya registrado y su código para el producto.'],
       ['margen_<lista>', 'Margen % sobre el costo para esa lista (el precio se recalcula al cambiar el costo).'],
       ['precio_<lista>', 'Precio fijo en USD sin IVA para esa lista (tiene prioridad sobre el margen).'],
@@ -181,6 +190,7 @@ export class ImportacionService {
       marcasCreadas: 0,
       errores: [],
     };
+    const referencia = `Importación ${nombreArchivo}`.slice(0, 60);
     try {
       let ctx = await this.cargarContexto(m);
       for (let i = 0; i < filas.length; i++) {
@@ -189,7 +199,7 @@ export class ImportacionService {
         const creadasAntes = { categorias: resultado.categoriasCreadas, marcas: resultado.marcasCreadas };
         await qr.query('SAVEPOINT fila_importacion');
         try {
-          const accion = await this.procesarFila(m, fila, ctx, resultado, usuario);
+          const accion = await this.procesarFila(m, fila, ctx, resultado, usuario, referencia);
           resultado[accion === 'creado' ? 'creados' : 'actualizados']++;
           await qr.query('RELEASE SAVEPOINT fila_importacion');
         } catch (e) {
@@ -214,13 +224,13 @@ export class ImportacionService {
   }
 
   private async cargarContexto(m: EntityManager) {
-    const [unidades, categorias, marcas, listas, proveedores] = await Promise.all([
-      m.find(UnidadMedida),
-      m.find(Categoria),
-      m.find(Marca),
-      m.find(ListaPrecio),
-      m.find(Proveedor),
-    ]);
+    // Una tras otra: dentro de la transacción todas usan la misma conexión,
+    // y pg no admite consultas simultáneas sobre un mismo cliente.
+    const unidades = await m.find(UnidadMedida);
+    const categorias = await m.find(Categoria);
+    const marcas = await m.find(Marca);
+    const listas = await m.find(ListaPrecio);
+    const proveedores = await m.find(Proveedor);
     return {
       unidades: new Map(unidades.map((u) => [u.codigo.toUpperCase(), u])),
       categorias,
@@ -236,6 +246,7 @@ export class ImportacionService {
     ctx: Awaited<ReturnType<ImportacionService['cargarContexto']>>,
     resultado: ResultadoImportacion,
     usuario: UsuarioSesion,
+    referencia: string,
   ): Promise<'creado' | 'actualizado'> {
     const codigo = normalizarCodigo(f.codigo ?? '');
     if (!codigo) throw new ErrorFila('Falta el código');
@@ -260,6 +271,7 @@ export class ImportacionService {
     if (f.iva && !iva) throw new ErrorFila(`IVA "${f.iva}" no reconocido (use GENERAL, REDUCIDA o EXENTO)`);
     const stockMinimo = numero(f.stock_minimo, 'stock_minimo', { min: 0 });
     const stockMaximo = numero(f.stock_maximo, 'stock_maximo', { min: 0 });
+    const existencia = numero(f.existencia, 'existencia', { min: 0 });
     if (f.ubicacion && f.ubicacion.length > 60) throw new ErrorFila('La ubicación supera 60 caracteres');
 
     const categoriaId = f.categoria ? await this.resolverCategoria(m, f.categoria, ctx, resultado) : undefined;
@@ -372,6 +384,24 @@ export class ImportacionService {
         },
         ['productoId', 'proveedorId'],
       );
+    }
+
+    if (existencia !== undefined) {
+      const diferencia = dec(existencia).minus(producto.existencia ?? '0');
+      if (!diferencia.isZero()) {
+        try {
+          await this.inventario.registrar(m, {
+            productoId: producto.id,
+            tipo: TipoMovimiento.CONTEO,
+            cantidad: diferencia,
+            motivo: 'Existencia cargada desde planilla',
+            referencia,
+            usuarioId: usuario.id,
+          });
+        } catch (e) {
+          throw new ErrorFila(`existencia: ${(e as Error).message}`);
+        }
+      }
     }
     return accion;
   }

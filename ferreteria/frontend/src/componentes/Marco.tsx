@@ -1,5 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
 import {
+  BookOpen,
+  ChartColumn,
+  Contact,
+  Boxes,
+  FileText,
   DollarSign,
   FolderTree,
   House,
@@ -7,11 +12,15 @@ import {
   LogOut,
   Menu,
   Package,
+  PackagePlus,
   Percent,
+  Receipt,
+  ShoppingCart,
   Settings,
   Truck,
   Upload,
   Users,
+  Wallet,
   X,
 } from 'lucide-react';
 import { FormEvent, ReactNode, useState } from 'react';
@@ -34,8 +43,17 @@ interface Enlace {
 
 const ENLACES: Enlace[] = [
   { a: '/', texto: 'Inicio', icono: <House className="size-4" /> },
+  { a: '/venta', texto: 'Punto de venta', icono: <ShoppingCart className="size-4" />, roles: ['GERENTE', 'CAJERO'] },
+  { a: '/caja', texto: 'Caja', icono: <Wallet className="size-4" />, roles: ['GERENTE', 'CAJERO'] },
+  { a: '/ventas', texto: 'Ventas', icono: <Receipt className="size-4" />, roles: ['GERENTE', 'CAJERO'] },
+  { a: '/facturacion', texto: 'Facturación', icono: <FileText className="size-4" />, roles: ['GERENTE', 'CAJERO'] },
+  { a: '/clientes', texto: 'Clientes', icono: <Contact className="size-4" />, roles: ['GERENTE', 'CAJERO'] },
+  { a: '/reportes', texto: 'Reportes', icono: <ChartColumn className="size-4" />, roles: ['GERENTE'] },
+  { a: '/libros', texto: 'Libros fiscales', icono: <BookOpen className="size-4" />, roles: ['GERENTE'] },
   { a: '/productos', texto: 'Productos', icono: <Package className="size-4" /> },
+  { a: '/inventario', texto: 'Inventario', icono: <Boxes className="size-4" /> },
   { a: '/catalogos', texto: 'Categorías y marcas', icono: <FolderTree className="size-4" />, roles: ['GERENTE', 'ALMACEN'] },
+  { a: '/compras', texto: 'Compras', icono: <PackagePlus className="size-4" />, roles: ['GERENTE', 'ALMACEN'] },
   { a: '/proveedores', texto: 'Proveedores', icono: <Truck className="size-4" />, roles: ['GERENTE', 'ALMACEN'] },
   { a: '/tasas', texto: 'Tasa de cambio', icono: <DollarSign className="size-4" /> },
   { a: '/precios/ajuste', texto: 'Ajuste de precios', icono: <Percent className="size-4" />, roles: ['GERENTE'] },
@@ -73,10 +91,10 @@ export function Marco() {
   );
 
   return (
-    <div className="min-h-screen lg:pl-60">
+    <div className="min-h-screen lg:pl-60 print:pl-0">
       {/* Barra lateral */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-60 transform bg-fondo-marca transition lg:translate-x-0 ${menuAbierto ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-30 w-60 transform bg-fondo-marca transition lg:translate-x-0 print:hidden ${menuAbierto ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="relative border-b border-neutral-800 px-3 py-3">
           <img src="/logo-texto.jpg" alt={NOMBRE_COMERCIAL} className="mx-auto h-auto w-full max-w-52" />
@@ -94,7 +112,7 @@ export function Marco() {
       {menuAbierto && <div className="fixed inset-0 z-20 bg-slate-900/40 lg:hidden" onClick={() => setMenuAbierto(false)} />}
 
       {/* Barra superior */}
-      <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur">
+      <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur print:hidden">
         <button className="text-slate-600 lg:hidden" onClick={() => setMenuAbierto(true)} aria-label="Abrir menú">
           <Menu className="size-5" />
         </button>
