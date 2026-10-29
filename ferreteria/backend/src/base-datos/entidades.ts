@@ -7,6 +7,7 @@ import { PrecioProducto } from '../catalogo/entidades/precio-producto.entity';
 import { Presentacion } from '../catalogo/entidades/presentacion.entity';
 import { Producto } from '../catalogo/entidades/producto.entity';
 import { UnidadMedida } from '../catalogo/entidades/unidad-medida.entity';
+import { Compra, CompraLinea, PagoProveedor } from '../compras/compra.entity';
 import { Parametro } from '../configuracion/parametro.entity';
 import { FacturaCompra } from '../fiscal/factura-compra.entity';
 import { MovimientoInventario } from '../inventario/movimiento-inventario.entity';
@@ -49,4 +50,7 @@ export const ENTIDADES = [
   NotaCredito,
   NotaCreditoLinea,
   FacturaCompra,
+  Compra,
+  CompraLinea,
+  PagoProveedor,
 ];

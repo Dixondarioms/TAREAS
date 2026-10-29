@@ -2,7 +2,7 @@
 
 Software de gestión de **La Casa del Inyector San Juan, C.A.**, ferretería pequeña o mediana en Venezuela, pensado para **instalarse en un servidor dentro de la tienda** y funcionar aunque falle internet.
 
-Esta versión incluye las **fases 1 a 4** del plan: catálogo, precios en dos monedas, tasa BCV, inventario, punto de venta, caja, facturación por talonario, notas de crédito y libros fiscales.
+Esta versión incluye las **fases 1 a 5** del plan: catálogo, precios en dos monedas, tasa BCV, inventario, punto de venta, caja, facturación por talonario, notas de crédito, libros fiscales, compras y cuentas por pagar.
 
 | Módulo | Qué hace |
 |---|---|
@@ -21,6 +21,8 @@ Esta versión incluye las **fases 1 a 4** del plan: catálogo, precios en dos mo
 | Caja | Apertura con fondo en Bs y USD, retiros, gastos e ingresos de efectivo, y cierre con arqueo por método de pago (esperado, contado y diferencia). Anulación de ventas mientras la caja sigue abierta. |
 | Notas de crédito | Devolución total o parcial de una factura, con su propio talonario y correlativo. Se calcula con la tasa y el IVA de la factura original, el reintegro sale de la caja abierta (efectivo Bs o USD, o pago móvil) y la mercancía vuelve al inventario salvo que llegue dañada. |
 | Libros fiscales | Libro de ventas (facturas, notas de crédito en negativo, facturas y hojas anuladas) y libro de compras del mes, con exportación a Excel, y resumen de débito y crédito fiscal para la declaración de IVA. Las facturas de proveedores se registran con sus montos en Bs y se valida que el IVA corresponda a la base. |
+| Compras | Recepción de mercancía con la factura o nota de entrega del proveedor, en Bs o USD: entra al inventario, actualiza el costo de reposición (y los precios por margen) y el costo por proveedor, y registra la factura en el libro de compras. |
+| Cuentas por pagar | Saldo de cada compra en su moneda, abonos con método y referencia, y vencimientos con aviso de las vencidas. |
 | Clientes | Cédula o RIF validado, nombre o razón social y dirección fiscal; sin cliente la factura sale a «Consumidor final». |
 | Respaldos | Copia diaria automática de la base de datos y script de restauración. |
 
@@ -198,6 +200,8 @@ Para restaurar un respaldo (reemplaza **todos** los datos actuales):
 | Notas de crédito de sus ventas (reintegro desde su caja) | ✓ | ✓ | — | ✓ |
 | Registrar o retirar talonarios | ✓ | ✓ | — | — |
 | Libros fiscales y facturas de compra | ✓ | ✓ | — | — |
+| Registrar compras (recepción) | ✓ | ✓ | ✓ (sin actualizar costos) | — |
+| Cuentas por pagar y pagos a proveedores | ✓ | ✓ | — | — |
 | Cargar o consultar la tasa BCV | ✓ | ✓ | — | — |
 | Usuarios y configuración | ✓ | — | — | — |
 
@@ -261,6 +265,6 @@ DB_NOMBRE_PRUEBAS=ferreteria_test npm run test:e2e
 
 ## Próximas fases
 
-1. **Compras:** órdenes de compra y recepción de mercancía que actualice existencias y costos y genere la factura del libro de compras; cuentas por pagar.
+1. **Órdenes de compra** previas a la recepción, y anulación de compras registradas por error.
 2. **Crédito a clientes y reportes:** cuentas por cobrar, comprobantes de retención de IVA, notas de débito, ventas y ganancias por período.
 3. **Imprenta digital**, si el negocio migra a ese esquema según lo que defina el contador.

@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { opcionesBaseDatos } from './base-datos/opciones';
 import { CatalogoModule } from './catalogo/catalogo.module';
+import { ComprasModule } from './compras/compras.module';
 import { leerConfiguracion } from './configuracion-app';
 import { ConfiguracionModule } from './configuracion/configuracion.module';
 import { FiscalModule } from './fiscal/fiscal.module';
@@ -28,6 +29,7 @@ import { VentasModule } from './ventas/ventas.module';
     InventarioModule,
     VentasModule,
     FiscalModule,
+    ComprasModule,
     SemillasModule,
   ],
   controllers: [SaludController],

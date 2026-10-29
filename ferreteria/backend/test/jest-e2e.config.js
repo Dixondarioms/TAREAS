@@ -5,5 +5,6 @@ module.exports = {
   testRegex: '.*\\.e2e-spec\\.ts$',
   transform: { '^.+\\.ts$': 'ts-jest' },
   testEnvironment: 'node',
-  testTimeout: 30000,
+  // La primera suite compila toda la API con ts-jest: en equipos lentos tarda más de 30 s.
+  testTimeout: 60000,
 };

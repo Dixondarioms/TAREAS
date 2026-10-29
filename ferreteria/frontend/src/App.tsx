@@ -7,6 +7,8 @@ import { Rol } from './lib/tipos';
 import { AjustePrecios } from './paginas/AjustePrecios';
 import { Caja } from './paginas/Caja';
 import { Catalogos } from './paginas/Catalogos';
+import { CompraFormulario } from './paginas/CompraFormulario';
+import { Compras } from './paginas/Compras';
 import { Configuracion } from './paginas/Configuracion';
 import { Facturacion } from './paginas/Facturacion';
 import { ConteoFisico } from './paginas/ConteoFisico';
@@ -73,6 +75,22 @@ export function App() {
           element={
             <Restringido roles={['GERENTE']}>
               <LibrosFiscales />
+            </Restringido>
+          }
+        />
+        <Route
+          path="compras"
+          element={
+            <Restringido roles={['GERENTE', 'ALMACEN']}>
+              <Compras />
+            </Restringido>
+          }
+        />
+        <Route
+          path="compras/nueva"
+          element={
+            <Restringido roles={['GERENTE', 'ALMACEN']}>
+              <CompraFormulario />
             </Restringido>
           }
         />
