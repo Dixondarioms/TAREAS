@@ -18,6 +18,7 @@ import { ConsultaPaginada } from '../comun/paginacion';
 import { EsDecimal } from '../comun/validadores';
 import { MetodoPago } from '../ventas/metodos-pago';
 import { CondicionCompra } from './compra.entity';
+import { EstadoOrden } from './orden-compra.entity';
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -79,6 +80,11 @@ export class CrearCompraDto {
   @IsIn([75, 100])
   porcentajeRetencion?: 75 | 100;
 
+  /** Orden de compra que se está recibiendo. */
+  @IsOptional()
+  @IsInt()
+  ordenId?: number;
+
   /** Actualizar el costo de reposición de los productos (solo gerencia). */
   @IsBoolean()
   actualizarCostos: boolean;
@@ -123,12 +129,79 @@ export class BuscarComprasDto extends ConsultaPaginada {
 
   /** pendientes: con saldo por pagar. */
   @IsOptional()
-  @IsIn(['pendientes', 'pagadas'])
-  pago?: 'pendientes' | 'pagadas';
+  @IsIn(['pendientes', 'pagadas', 'anuladas'])
+  pago?: 'pendientes' | 'pagadas' | 'anuladas';
 
   /** Número de documento o proveedor. */
   @IsOptional()
   @IsString()
   @MaxLength(100)
   q?: string;
+}
+
+export class AnularCompraDto {
+  @IsString()
+  @MinLength(3)
+  @MaxLength(200)
+  motivo: string;
+}
+
+export class LineaOrdenDto {
+  @IsInt()
+  productoId: number;
+
+  @IsOptional()
+  @IsInt()
+  presentacionId?: number | null;
+
+  @EsDecimal({ min: '0.001', decimales: 3 })
+  cantidad: string;
+
+  /** Sin IVA, en la moneda de la orden, por la unidad pedida. */
+  @EsDecimal({ min: '0', decimales: 4 })
+  costoUnitario: string;
+}
+
+export class CrearOrdenDto {
+  @IsInt()
+  proveedorId: number;
+
+  @Matches(FECHA, { message: 'fecha debe tener el formato AAAA-MM-DD' })
+  fecha: string;
+
+  @IsIn(['BS', 'USD'])
+  moneda: 'BS' | 'USD';
+
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Agregue al menos un producto' })
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => LineaOrdenDto)
+  lineas: LineaOrdenDto[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  notas?: string;
+}
+
+export class BuscarOrdenesDto extends ConsultaPaginada {
+  @IsOptional()
+  @Transform(aEntero)
+  @IsInt()
+  proveedorId?: number;
+
+  /** abiertas: pendientes o recibidas en parte. */
+  @IsOptional()
+  @IsIn(['abiertas', ...Object.values(EstadoOrden)])
+  estado?: 'abiertas' | EstadoOrden;
+}
+
+export class SugerenciaOrdenDto {
+  @Transform(aEntero)
+  @IsInt()
+  proveedorId: number;
+
+  @IsIn(['BS', 'USD'])
+  moneda: 'BS' | 'USD';
 }

@@ -21,7 +21,8 @@ Esta versión incluye las **fases 1 a 6** del plan: catálogo, precios en dos mo
 | Caja | Apertura con fondo en Bs y USD, retiros, gastos e ingresos de efectivo, y cierre con arqueo por método de pago (esperado, contado y diferencia). Anulación de ventas mientras la caja sigue abierta. |
 | Notas de crédito | Devolución total o parcial de una factura, con su propio talonario y correlativo. Se calcula con la tasa y el IVA de la factura original, el reintegro sale de la caja abierta (efectivo Bs o USD, o pago móvil) y la mercancía vuelve al inventario salvo que llegue dañada. |
 | Libros fiscales | Libro de ventas (facturas, notas de crédito en negativo, facturas y hojas anuladas) y libro de compras del mes, con exportación a Excel, y resumen de débito y crédito fiscal para la declaración de IVA. Las facturas de proveedores se registran con sus montos en Bs y se valida que el IVA corresponda a la base. |
-| Compras | Recepción de mercancía con la factura o nota de entrega del proveedor, en Bs o USD: entra al inventario, actualiza el costo de reposición (y los precios por margen) y el costo por proveedor, y registra la factura en el libro de compras. |
+| Compras | Recepción de mercancía con la factura o nota de entrega del proveedor, en Bs o USD: entra al inventario, actualiza el costo de reposición (y los precios por margen) y el costo por proveedor, y registra la factura en el libro de compras. Gerencia puede anular una compra registrada por error (sin pagos y con la mercancía aún en existencia): sale del inventario, el costo vuelve al anterior y deja el libro de compras. |
+| Órdenes de compra | Pedido imprimible al proveedor, armado a mano o con «Sugerir por mínimos» (productos del proveedor bajo el mínimo, hasta la existencia máxima, descontando lo ya pedido). Al llegar la mercancía se recibe desde la orden con lo pendiente ya cargado; la orden queda recibida en parte o completa, o se cancela. |
 | Cuentas por pagar | Saldo de cada compra en su moneda, abonos con método y referencia, y vencimientos con aviso de las vencidas. |
 | Clientes | Cédula o RIF validado (solo números se toman como cédula V-), nombre o razón social y dirección fiscal; sin cliente la factura sale a «Consumidor final». |
 | Retenciones de IVA | Si la empresa es agente de retención (contribuyente especial), cada factura de proveedor retiene el 75 % (o 100 %) del IVA, emite el comprobante numerado AAAAMM + 8 dígitos (imprimible), descuenta la retención de lo que se le debe al proveedor y genera el archivo TXT por quincena para el portal del SENIAT. Las retenciones que hacen los clientes agentes se cobran con el método «Retención de IVA» (con su número de comprobante), van al libro de ventas y se restan de la cuota. |
@@ -204,7 +205,8 @@ Para restaurar un respaldo (reemplaza **todos** los datos actuales):
 | Notas de crédito de sus ventas (reintegro desde su caja) | ✓ | ✓ | — | ✓ |
 | Registrar o retirar talonarios | ✓ | ✓ | — | — |
 | Libros fiscales y facturas de compra | ✓ | ✓ | — | — |
-| Registrar compras (recepción) | ✓ | ✓ | ✓ (sin actualizar costos) | — |
+| Registrar compras (recepción) y órdenes de compra | ✓ | ✓ | ✓ (sin actualizar costos) | — |
+| Anular compras registradas por error | ✓ | ✓ | — | — |
 | Cuentas por pagar y pagos a proveedores | ✓ | ✓ | — | — |
 | Vender fiado (dentro del límite) y recibir abonos | ✓ | ✓ | — | ✓ |
 | Asignar crédito, ver cuentas por cobrar y reportes | ✓ | ✓ | — | — |
@@ -271,5 +273,4 @@ DB_NOMBRE_PRUEBAS=ferreteria_test npm run test:e2e
 
 ## Próximas fases
 
-1. **Órdenes de compra** previas a la recepción, y anulación de compras registradas por error.
-2. **Imprenta digital**, si el negocio migra a ese esquema según lo que defina el contador.
+1. **Imprenta digital**, si el negocio migra a ese esquema según lo que defina el contador.

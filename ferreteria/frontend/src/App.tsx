@@ -97,6 +97,14 @@ export function App() {
           }
         />
         <Route
+          path="compras/ordenes/nueva"
+          element={
+            <Restringido roles={['GERENTE', 'ALMACEN']}>
+              <CompraFormulario modo="orden" />
+            </Restringido>
+          }
+        />
+        <Route
           path="clientes"
           element={
             <Restringido roles={['GERENTE', 'CAJERO']}>

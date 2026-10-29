@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ScanBarcode, Trash2 } from 'lucide-react';
+import { ArrowLeft, ListChecks, ScanBarcode, Trash2 } from 'lucide-react';
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useAvisos } from '../componentes/avisos';
 import { Aviso, Boton, Campo, Casilla, Encabezado, Selector, Tabla, Tarjeta, td, th } from '../componentes/ui';
 import { api, ErrorApi } from '../lib/api';
-import { Compra, MonedaCompra, simbolo } from '../lib/compras';
+import { Compra, LineaSugerida, MonedaCompra, OrdenCompra, simbolo } from '../lib/compras';
 import { useConfiguracion, useEstadoTasas } from '../lib/consultas';
 import { aDecimalApi, numero, sinCeros } from '../lib/formato';
 import { useSesion } from '../lib/sesion';
@@ -28,10 +28,18 @@ interface Linea {
 const hoy = () => new Date().toLocaleDateString('en-CA');
 const esNumero = (t: string) => t.trim() !== '' && Number.isFinite(Number(aDecimalApi(t))) && Number(aDecimalApi(t)) >= 0;
 
-export function CompraFormulario() {
+/**
+ * Registro de una compra (mercancía recibida) o de una orden de compra
+ * (pedido al proveedor, no mueve inventario). Con ?orden=N recibe esa orden:
+ * propone lo que falta por llegar.
+ */
+export function CompraFormulario({ modo = 'compra' }: { modo?: 'compra' | 'orden' }) {
+  const esOrden = modo === 'orden';
   const { puede } = useSesion();
   const avisos = useAvisos();
   const navegar = useNavigate();
+  const [parametros] = useSearchParams();
+  const ordenId = esOrden ? null : Number(parametros.get('orden')) || null;
   const consultas = useQueryClient();
   const config = useConfiguracion();
   const tasas = useEstadoTasas();
@@ -56,7 +64,37 @@ export function CompraFormulario() {
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
+  const [sugiriendo, setSugiriendo] = useState(false);
   const buscador = useRef<HTMLInputElement>(null);
+
+  const orden = useQuery({
+    queryKey: ['compras', 'ordenes', 'detalle', ordenId],
+    queryFn: () => api.get<OrdenCompra>(`/compras/ordenes/${ordenId}`),
+    enabled: ordenId !== null,
+  });
+  // Al recibir una orden se proponen su proveedor, su moneda y lo que falta por llegar.
+  const ordenCargada = useRef(false);
+  useEffect(() => {
+    const o = orden.data;
+    if (!o || ordenCargada.current) return;
+    ordenCargada.current = true;
+    setCabecera((c) => ({ ...c, proveedorId: String(o.proveedorId), moneda: o.moneda }));
+    const pendientes = (o.lineas ?? []).filter((l) => Number(l.cantidad) > Number(l.cantidadRecibida));
+    void Promise.all(pendientes.map((l) => api.get<ProductoDetalle>(`/productos/${l.productoId}`))).then(
+      (productos) =>
+        setLineas(
+          pendientes.map((l, i) =>
+            nuevaLinea(
+              productos[i],
+              l.presentacionId,
+              sinCeros(String(Number(l.cantidad) - Number(l.cantidadRecibida))),
+              sinCeros(l.costoUnitario),
+            ),
+          ),
+        ),
+      avisos.error,
+    );
+  }, [orden.data, avisos.error]);
 
   // La tasa se propone con la BCV vigente; el usuario puede corregirla.
   useEffect(() => {
@@ -82,31 +120,32 @@ export function CompraFormulario() {
     return valor ? String(Math.round(valor * 10000) / 10000) : '';
   };
 
-  const agregar = (p: ProductoDetalle, presentacionId: number | null) => {
+  function nuevaLinea(p: ProductoDetalle, presentacionId: number | null, cantidad = '', costo?: string): Linea {
     const opciones = [
       { presentacionId: null, unidad: p.unidadBase.codigo, factor: '1' },
       ...p.presentaciones.map((pr) => ({ presentacionId: pr.id, unidad: pr.unidad.codigo, factor: pr.factor })),
     ];
     const factor = opciones.find((o) => o.presentacionId === presentacionId)?.factor ?? '1';
-    const clave = `${p.id}-${presentacionId ?? 'base'}`;
-    if (lineas.some((l) => l.clave === clave)) {
-      avisos.error(new Error(`${p.codigo} ya está en la compra`));
+    return {
+      clave: `${p.id}-${presentacionId ?? 'base'}`,
+      productoId: p.id,
+      codigo: p.codigo,
+      descripcion: p.descripcion,
+      alicuotaIva: p.alicuotaIva,
+      costoUsd: p.costoUsd,
+      opciones,
+      presentacionId,
+      cantidad,
+      costoUnitario: costo ?? costoSugerido(p.costoUsd, factor),
+    };
+  }
+
+  const agregar = (p: ProductoDetalle, presentacionId: number | null) => {
+    const linea = nuevaLinea(p, presentacionId);
+    if (lineas.some((l) => l.clave === linea.clave)) {
+      avisos.error(new Error(`${p.codigo} ya está en ${esOrden ? 'la orden' : 'la compra'}`));
     } else {
-      setLineas((ls) => [
-        ...ls,
-        {
-          clave,
-          productoId: p.id,
-          codigo: p.codigo,
-          descripcion: p.descripcion,
-          alicuotaIva: p.alicuotaIva,
-          costoUsd: p.costoUsd,
-          opciones,
-          presentacionId,
-          cantidad: '',
-          costoUnitario: costoSugerido(p.costoUsd, factor),
-        },
-      ]);
+      setLineas((ls) => [...ls, linea]);
     }
     setTexto('');
     setQ('');
@@ -127,6 +166,33 @@ export function CompraFormulario() {
       const unico = sugerencias.data?.datos.length === 1 ? sugerencias.data.datos[0] : null;
       if (unico) agregar(await api.get<ProductoDetalle>(`/productos/${unico.id}`), null);
       else if (!(error instanceof ErrorApi && error.estado === 404)) avisos.error(error);
+    }
+  };
+
+  /** Agrega los productos del proveedor que están bajo el mínimo. */
+  const sugerir = async () => {
+    setSugiriendo(true);
+    try {
+      const sugeridas = await api.get<LineaSugerida[]>('/compras/ordenes/sugerencia', {
+        proveedorId: cabecera.proveedorId,
+        moneda: cabecera.moneda,
+      });
+      const nuevas = sugeridas.filter((s) => !lineas.some((l) => l.clave === `${s.productoId}-base`));
+      if (nuevas.length === 0) {
+        avisos.exito(
+          sugeridas.length === 0
+            ? 'Ningún producto de este proveedor está bajo el mínimo'
+            : 'Los productos bajo el mínimo ya están en la orden',
+        );
+        return;
+      }
+      const productos = await Promise.all(nuevas.map((s) => api.get<ProductoDetalle>(`/productos/${s.productoId}`)));
+      setLineas((ls) => [...ls, ...nuevas.map((s, i) => nuevaLinea(productos[i], null, s.cantidad, s.costoUnitario))]);
+      avisos.exito(`${nuevas.length} producto(s) bajo el mínimo agregados`);
+    } catch (e) {
+      avisos.error(e);
+    } finally {
+      setSugiriendo(false);
     }
   };
 
@@ -151,9 +217,33 @@ export function CompraFormulario() {
     lineas.length > 0 &&
     lineas.every((l) => esNumero(l.cantidad) && Number(aDecimalApi(l.cantidad)) > 0 && esNumero(l.costoUnitario));
 
+  const lineasApi = () =>
+    lineas.map((l) => ({
+      productoId: l.productoId,
+      presentacionId: l.presentacionId,
+      cantidad: aDecimalApi(l.cantidad),
+      costoUnitario: aDecimalApi(l.costoUnitario),
+    }));
+  const guardarOrden = useMutation({
+    mutationFn: () =>
+      api.post<OrdenCompra>('/compras/ordenes', {
+        proveedorId: Number(cabecera.proveedorId),
+        fecha: cabecera.fecha,
+        moneda: cabecera.moneda,
+        notas: cabecera.notas || undefined,
+        lineas: lineasApi(),
+      }),
+    onSuccess: (o) => {
+      avisos.exito(`Orden de compra N° ${o.id} creada: imprímala o envíela al proveedor`);
+      void consultas.invalidateQueries({ queryKey: ['compras'] });
+      navegar(`/compras?vista=ordenes&orden=${o.id}`);
+    },
+    onError: avisos.error,
+  });
   const guardar = useMutation({
     mutationFn: () =>
       api.post<Compra>('/compras', {
+        ordenId: ordenId ?? undefined,
         proveedorId: Number(cabecera.proveedorId),
         fecha: cabecera.fecha,
         numero: cabecera.numero,
@@ -165,12 +255,7 @@ export function CompraFormulario() {
         facturaFiscal: cabecera.facturaFiscal,
         actualizarCostos: cabecera.actualizarCostos,
         notas: cabecera.notas || undefined,
-        lineas: lineas.map((l) => ({
-          productoId: l.productoId,
-          presentacionId: l.presentacionId,
-          cantidad: aDecimalApi(l.cantidad),
-          costoUnitario: aDecimalApi(l.costoUnitario),
-        })),
+        lineas: lineasApi(),
       }),
     onSuccess: (c) => {
       avisos.exito(`Compra ${c.numero} registrada: la mercancía ya está en el inventario`);
@@ -192,12 +277,17 @@ export function CompraFormulario() {
     <form
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
-        guardar.mutate();
+        if (esOrden) guardarOrden.mutate();
+        else guardar.mutate();
       }}
     >
       <Encabezado
-        titulo="Registrar compra"
-        descripcion="Copie los datos del documento del proveedor. Al guardar, la mercancía entra al inventario."
+        titulo={esOrden ? 'Nueva orden de compra' : ordenId ? `Recibir orden de compra N° ${ordenId}` : 'Registrar compra'}
+        descripcion={
+          esOrden
+            ? 'Pedido al proveedor. No mueve el inventario: la mercancía entra cuando se recibe.'
+            : 'Copie los datos del documento del proveedor. Al guardar, la mercancía entra al inventario.'
+        }
         acciones={
           <>
             <Link to="/compras">
@@ -205,16 +295,22 @@ export function CompraFormulario() {
                 Volver
               </Boton>
             </Link>
-            <Boton type="submit" disabled={!completas} cargando={guardar.isPending}>
-              Guardar compra
+            <Boton type="submit" disabled={!completas} cargando={guardar.isPending || guardarOrden.isPending}>
+              {esOrden ? 'Crear orden' : 'Guardar compra'}
             </Boton>
           </>
         }
       />
       <div className="grid gap-5 xl:grid-cols-[24rem_1fr]">
-        <Tarjeta titulo="Documento">
+        <Tarjeta titulo={esOrden ? 'Orden' : 'Documento'}>
           <div className="space-y-3">
-            <Selector etiqueta="Proveedor" required {...campo('proveedorId')}>
+            {ordenId && (
+              <Aviso tipo="info">
+                Se cargó lo que falta por llegar de la orden N° {ordenId}. Ajuste las cantidades y costos a lo que dice el
+                documento del proveedor.
+              </Aviso>
+            )}
+            <Selector etiqueta="Proveedor" required disabled={ordenId !== null} {...campo('proveedorId')}>
               <option value="">— Elija —</option>
               {proveedores.data?.datos
                 .filter((p) => p.activo)
@@ -233,35 +329,64 @@ export function CompraFormulario() {
                 .
               </Aviso>
             )}
-            <div className="grid grid-cols-2 gap-3">
-              <Campo etiqueta="Fecha" type="date" required {...campo('fecha')} />
-              <Campo etiqueta="N° de documento" required {...campo('numero')} />
-            </div>
-            <Casilla
-              etiqueta="Es factura fiscal (va al libro de compras)"
-              checked={cabecera.facturaFiscal}
-              onChange={(e) => setCabecera({ ...cabecera, facturaFiscal: e.target.checked })}
-            />
-            {cabecera.facturaFiscal && <Campo etiqueta="N° de control" required {...campo('numeroControl')} />}
-            <div className="grid grid-cols-2 gap-3">
-              <Selector
-                etiqueta="Moneda"
-                value={cabecera.moneda}
-                onChange={(e) => setCabecera({ ...cabecera, moneda: e.target.value as MonedaCompra })}
+            {esOrden ? (
+              <div className="grid grid-cols-2 gap-3">
+                <Campo etiqueta="Fecha" type="date" required {...campo('fecha')} />
+                <Selector
+                  etiqueta="Moneda"
+                  value={cabecera.moneda}
+                  onChange={(e) => setCabecera({ ...cabecera, moneda: e.target.value as MonedaCompra })}
+                >
+                  <option value="USD">Dólares</option>
+                  <option value="BS">Bolívares</option>
+                </Selector>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Campo etiqueta="Fecha" type="date" required {...campo('fecha')} />
+                  <Campo etiqueta="N° de documento" required {...campo('numero')} />
+                </div>
+                <Casilla
+                  etiqueta="Es factura fiscal (va al libro de compras)"
+                  checked={cabecera.facturaFiscal}
+                  onChange={(e) => setCabecera({ ...cabecera, facturaFiscal: e.target.checked })}
+                />
+                {cabecera.facturaFiscal && <Campo etiqueta="N° de control" required {...campo('numeroControl')} />}
+                <div className="grid grid-cols-2 gap-3">
+                  <Selector
+                    etiqueta="Moneda"
+                    value={cabecera.moneda}
+                    disabled={ordenId !== null}
+                    onChange={(e) => setCabecera({ ...cabecera, moneda: e.target.value as MonedaCompra })}
+                  >
+                    <option value="USD">Dólares</option>
+                    <option value="BS">Bolívares</option>
+                  </Selector>
+                  <Campo etiqueta="Tasa (Bs por $)" inputMode="decimal" required {...campo('tasa')} />
+                </div>
+              </>
+            )}
+            {esOrden && (
+              <Boton
+                variante="secundario"
+                className="w-full"
+                icono={<ListChecks className="size-4" />}
+                disabled={!cabecera.proveedorId}
+                cargando={sugiriendo}
+                onClick={() => void sugerir()}
               >
-                <option value="USD">Dólares</option>
-                <option value="BS">Bolívares</option>
-              </Selector>
-              <Campo etiqueta="Tasa (Bs por $)" inputMode="decimal" required {...campo('tasa')} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+                Sugerir por mínimos
+              </Boton>
+            )}
+            <div className={esOrden ? 'hidden' : 'grid grid-cols-2 gap-3'}>
               <Selector etiqueta="Condición" {...campo('condicion')}>
                 <option value="CONTADO">Contado</option>
                 <option value="CREDITO">Crédito</option>
               </Selector>
               {cabecera.condicion === 'CREDITO' && <Campo etiqueta="Vence" type="date" required {...campo('vencimiento')} />}
             </div>
-            {puede('GERENTE') && (
+            {puede('GERENTE') && !esOrden && (
               <Casilla
                 etiqueta="Actualizar el costo de los productos (y sus precios por margen)"
                 checked={cabecera.actualizarCostos}
@@ -272,7 +397,7 @@ export function CompraFormulario() {
           </div>
         </Tarjeta>
 
-        <Tarjeta titulo="Productos recibidos">
+        <Tarjeta titulo={esOrden ? 'Productos a pedir' : 'Productos recibidos'}>
           <div className="relative">
             <ScanBarcode className="pointer-events-none absolute top-2.5 left-3 size-4 text-slate-400" />
             <input
@@ -282,7 +407,7 @@ export function CompraFormulario() {
               onKeyDown={(e) => void alPresionarTecla(e)}
               placeholder="Escanee o escriba código o nombre del producto…"
               className="block w-full rounded-lg border-0 py-2 pr-3 pl-9 text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-marca-500"
-              aria-label="Agregar producto a la compra"
+              aria-label={esOrden ? 'Agregar producto a la orden' : 'Agregar producto a la compra'}
             />
             {q.length >= 2 && (
               <ul className="absolute z-20 mt-1 max-h-72 w-full divide-y divide-slate-100 overflow-y-auto rounded-lg bg-white shadow-lg ring-1 ring-slate-200">
@@ -306,7 +431,11 @@ export function CompraFormulario() {
           </div>
 
           {lineas.length === 0 ? (
-            <p className="py-10 text-center text-sm text-slate-500">Agregue los productos que llegaron.</p>
+            <p className="py-10 text-center text-sm text-slate-500">
+              {esOrden
+                ? 'Agregue los productos a pedir, o elija el proveedor y use «Sugerir por mínimos».'
+                : 'Agregue los productos que llegaron.'}
+            </p>
           ) : (
             <div className="mt-3">
               <Tabla>
@@ -360,7 +489,7 @@ export function CompraFormulario() {
                           <input
                             inputMode="decimal"
                             value={l.cantidad}
-                            aria-label={`Cantidad recibida de ${l.codigo}`}
+                            aria-label={`Cantidad ${esOrden ? 'pedida' : 'recibida'} de ${l.codigo}`}
                             onChange={(e) => cambiar(l.clave, { cantidad: e.target.value })}
                             className="cifra block w-full rounded-lg border-0 px-2 py-1.5 text-right text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-marca-500"
                           />
@@ -397,18 +526,24 @@ export function CompraFormulario() {
                     {s} {numero(subtotal, 2)}
                   </span>
                 </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>IVA</span>
-                  <span className="cifra">
-                    {s} {numero(iva, 2)}
-                  </span>
-                </div>
-                <div className="flex justify-between font-semibold text-slate-900">
-                  <span>Total</span>
-                  <span className="cifra">
-                    {s} {numero(subtotal + iva, 2)}
-                  </span>
-                </div>
+                {esOrden ? (
+                  <p className="text-xs text-slate-500">Estimado sin IVA: el total final lo da la factura del proveedor.</p>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-slate-600">
+                      <span>IVA</span>
+                      <span className="cifra">
+                        {s} {numero(iva, 2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-slate-900">
+                      <span>Total</span>
+                      <span className="cifra">
+                        {s} {numero(subtotal + iva, 2)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

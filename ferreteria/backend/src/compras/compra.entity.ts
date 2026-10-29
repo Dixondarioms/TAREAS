@@ -3,8 +3,14 @@ import { AlicuotaIva } from '../catalogo/entidades/producto.entity';
 import { FacturaCompra } from '../fiscal/factura-compra.entity';
 import { Proveedor } from '../proveedores/proveedor.entity';
 import { Usuario } from '../usuarios/usuario.entity';
+import { OrdenCompra } from './orden-compra.entity';
 
 export type MonedaCompra = 'BS' | 'USD';
+
+export enum EstadoCompra {
+  REGISTRADA = 'REGISTRADA',
+  ANULADA = 'ANULADA',
+}
 
 export enum CondicionCompra {
   CONTADO = 'CONTADO',
@@ -17,7 +23,8 @@ export enum CondicionCompra {
  */
 @Entity('compras')
 @Index('idx_compras_proveedor', ['proveedorId'])
-@Index('uq_compras_documento', ['proveedorId', 'numero'], { unique: true })
+/** Una compra anulada no impide registrar de nuevo el mismo documento. */
+@Index('uq_compras_documento', ['proveedorId', 'numero'], { unique: true, where: `estado <> 'ANULADA'` })
 export class Compra {
   @PrimaryGeneratedColumn({ primaryKeyConstraintName: 'PK_compras' })
   id: number;
@@ -70,6 +77,23 @@ export class Compra {
   /** Lo que falta pagar al proveedor (total − retención − abonos), en la moneda de la compra. */
   @Column({ type: 'numeric', precision: 18, scale: 2 })
   saldo: string;
+
+  @Column({ type: 'enum', enum: EstadoCompra, enumName: 'estado_compra', default: EstadoCompra.REGISTRADA })
+  estado: EstadoCompra;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  anuladaEn: Date | null;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  motivoAnulacion: string | null;
+
+  /** Orden de compra que se recibió con esta compra. */
+  @Column({ type: 'int', nullable: true })
+  ordenId: number | null;
+
+  @ManyToOne(() => OrdenCompra, { nullable: true, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'orden_id', foreignKeyConstraintName: 'fk_compras_orden' })
+  orden: OrdenCompra | null;
 
   /** Si se actualizó el costo de reposición de los productos. */
   @Column()

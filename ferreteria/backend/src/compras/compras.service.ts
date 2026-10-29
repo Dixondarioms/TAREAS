@@ -18,8 +18,11 @@ import { Proveedor } from '../proveedores/proveedor.entity';
 import { Moneda } from '../tasas/tasa-cambio.entity';
 import { TasasService } from '../tasas/tasas.service';
 import { ROLES_FIJAN_PRECIOS } from '../usuarios/rol.enum';
-import { Compra, CompraLinea, CondicionCompra, PagoProveedor } from './compra.entity';
+import { Compra, CompraLinea, CondicionCompra, EstadoCompra, PagoProveedor } from './compra.entity';
 import { BuscarComprasDto, CrearCompraDto, PagoProveedorDto } from './compras.dto';
+import { EstadoOrden, OrdenCompra } from './orden-compra.entity';
+import { aplicarRecepcion } from './ordenes.service';
+import { unidadDeLinea } from './unidades';
 
 const b2 = (v: Dec) => redondear(v, DECIMALES_BS);
 
@@ -75,7 +78,7 @@ export class ComprasService {
     const proveedor = await this.ds.getRepository(Proveedor).findOneBy({ id: dto.proveedorId });
     if (!proveedor) throw new NotFoundException('Proveedor no encontrado');
     const numero = dto.numero.trim();
-    if (await this.ds.getRepository(Compra).existsBy({ proveedorId: proveedor.id, numero })) {
+    if (await this.ds.getRepository(Compra).existsBy({ proveedorId: proveedor.id, numero, estado: EstadoCompra.REGISTRADA })) {
       throw new ConflictException(`Ya se registró el documento ${numero} de ${proveedor.razonSocial}`);
     }
     if (
@@ -96,6 +99,14 @@ export class ComprasService {
     const { alicuotasIva, empresa } = await this.configuracion.obtenerTodo();
 
     const id = await this.ds.transaction(async (m) => {
+      if (dto.ordenId) {
+        const orden = await m.getRepository(OrdenCompra).findOneBy({ id: dto.ordenId });
+        if (!orden) throw new NotFoundException('Orden de compra no encontrada');
+        if (orden.proveedorId !== proveedor.id) throw new BadRequestException('La orden de compra es de otro proveedor');
+        if (orden.estado !== EstadoOrden.PENDIENTE && orden.estado !== EstadoOrden.PARCIAL) {
+          throw new ConflictException(`La orden de compra N° ${orden.id} ya está ${orden.estado.toLowerCase()}`);
+        }
+      }
       const ids = [...new Set(dto.lineas.map((l) => l.productoId))];
       const productos = await m.getRepository(Producto).find({
         where: { id: In(ids) },
@@ -107,20 +118,10 @@ export class ComprasService {
       const lineas = dto.lineas.map((l) => {
         const p = porId.get(l.productoId);
         if (!p) throw new NotFoundException(`Producto ${l.productoId} no encontrado`);
-        let unidad = p.unidadBase;
-        let factor = '1';
-        if (l.presentacionId) {
-          const pre = p.presentaciones.find((x) => x.id === l.presentacionId);
-          if (!pre) throw new BadRequestException(`La presentación indicada no pertenece a ${p.codigo}`);
-          unidad = pre.unidad;
-          factor = pre.factor;
-        }
-        if (!unidad.permiteDecimales && !dec(l.cantidad).isInteger()) {
-          throw new BadRequestException(`${p.codigo} se recibe por ${unidad.codigo}: la cantidad debe ser un número entero`);
-        }
+        const { unidad, factor } = unidadDeLinea(p, l.presentacionId, l.cantidad);
         const subtotal = b2(dec(l.costoUnitario).times(l.cantidad));
         bases[p.alicuotaIva] = bases[p.alicuotaIva].plus(subtotal);
-        return { l, p, unidad: unidad.codigo, factor, subtotal };
+        return { l, p, unidad, factor, subtotal };
       });
       const ivaGeneral = b2(montoIva(bases.GENERAL, alicuotasIva.GENERAL));
       const ivaReducida = b2(montoIva(bases.REDUCIDA, alicuotasIva.REDUCIDA));
@@ -176,6 +177,7 @@ export class ComprasService {
           retencionIva: retencion.toFixed(2),
           saldo: total.minus(retencion).toFixed(2),
           actualizoCostos: dto.actualizarCostos,
+          ordenId: dto.ordenId ?? null,
           facturaCompraId,
           notas: dto.notas?.trim() || null,
           usuarioId: usuario.id,
@@ -239,7 +241,112 @@ export class ComprasService {
           usuarioId: usuario.id,
         });
       }
+      if (dto.ordenId) {
+        await aplicarRecepcion(
+          m,
+          dto.ordenId,
+          dto.lineas.map((l) => ({ productoId: l.productoId, presentacionId: l.presentacionId ?? null, cantidad: l.cantidad })),
+          1,
+        );
+      }
       return compra.id;
+    });
+    return this.detalle(id);
+  }
+
+  /**
+   * Anula una compra registrada por error: saca del inventario lo que entró,
+   * devuelve el costo anterior (si nadie lo cambió después), la quita del libro
+   * de compras y descuenta lo recibido en su orden. No se puede si ya tiene
+   * pagos, si su comprobante de retención no es el último del mes en curso o
+   * si la mercancía ya salió del inventario.
+   */
+  async anular(id: number, motivo: string, usuario: UsuarioSesion): Promise<Compra> {
+    await this.ds.transaction(async (m) => {
+      const compra = await m.getRepository(Compra).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!compra) throw new NotFoundException('Compra no encontrada');
+      if (compra.estado === EstadoCompra.ANULADA) throw new ConflictException('La compra ya está anulada');
+      if (await m.getRepository(PagoProveedor).existsBy({ compraId: id })) {
+        throw new BadRequestException('La compra tiene pagos registrados: no se puede anular');
+      }
+      const proveedor = await m.getRepository(Proveedor).findOneByOrFail({ id: compra.proveedorId });
+      const lineas = await m.getRepository(CompraLinea).find({ where: { compraId: id }, order: { id: 'ASC' } });
+
+      if (compra.facturaCompraId) {
+        const factura = await m.getRepository(FacturaCompra).findOneByOrFail({ id: compra.facturaCompraId });
+        if (factura.numeroComprobante) {
+          // Solo se libera el último número del mes en curso: anular otro dejaría un salto en el correlativo.
+          await m.query(`SELECT pg_advisory_xact_lock(hashtext('comprobantes_retencion_iva'))`);
+          const periodo = factura.numeroComprobante.slice(0, 6);
+          const [{ ultimo }] = await m.query(
+            `SELECT max(numero_comprobante) AS ultimo FROM facturas_compra WHERE numero_comprobante LIKE $1`,
+            [`${periodo}%`],
+          );
+          if (periodo !== hoyEnCaracas().slice(0, 7).replace('-', '') || ultimo !== factura.numeroComprobante) {
+            throw new BadRequestException(
+              `Ya se emitió el comprobante de retención ${factura.numeroComprobante} y no es el último del mes: registre la nota de crédito del proveedor en lugar de anular`,
+            );
+          }
+        }
+      }
+
+      const referencia = `Compra ${compra.numero} ${proveedor.razonSocial}`.slice(0, 60);
+      const salidas = new Map<number, Dec>();
+      for (const l of lineas)
+        salidas.set(l.productoId, (salidas.get(l.productoId) ?? dec(0)).plus(dec(l.cantidad).times(l.factor)));
+      for (const productoId of [...salidas.keys()].sort((a, b) => a - b)) {
+        try {
+          await this.inventario.registrar(m, {
+            productoId,
+            tipo: TipoMovimiento.SALIDA,
+            cantidad: salidas.get(productoId)!.toDecimalPlaces(3).negated(),
+            motivo: `Anulación de compra: ${motivo.trim()}`.slice(0, 200),
+            referencia,
+            usuarioId: usuario.id,
+          });
+        } catch (e) {
+          if (e instanceof BadRequestException) {
+            throw new BadRequestException(`No se puede anular: ${e.message}. Parte de la mercancía ya salió del inventario.`);
+          }
+          throw e;
+        }
+        if (!compra.actualizoCostos) continue;
+        // Se revierte el costo solo si el último cambio fue el de esta compra.
+        const ultimo = await m.getRepository(HistorialCosto).findOne({ where: { productoId }, order: { id: 'DESC' } });
+        const producto = await m.getRepository(Producto).findOneByOrFail({ id: productoId });
+        if (ultimo && ultimo.motivo === referencia && dec(ultimo.costoNuevo).eq(producto.costoUsd)) {
+          await m.insert(HistorialCosto, {
+            productoId,
+            costoAnterior: producto.costoUsd,
+            costoNuevo: ultimo.costoAnterior,
+            motivo: `Anulación ${referencia}`.slice(0, 200),
+            usuarioId: usuario.id,
+          });
+          await m.update(Producto, { id: productoId }, { costoUsd: ultimo.costoAnterior, costoActualizadoEn: new Date() });
+          await this.productos.recalcularPreciosPorCosto(m, { id: productoId, costoUsd: ultimo.costoAnterior });
+        }
+      }
+
+      if (compra.ordenId) {
+        await aplicarRecepcion(
+          m,
+          compra.ordenId,
+          lineas.map((l) => ({ productoId: l.productoId, presentacionId: l.presentacionId, cantidad: l.cantidad })),
+          -1,
+        );
+      }
+      await m.update(
+        Compra,
+        { id },
+        {
+          estado: EstadoCompra.ANULADA,
+          anuladaEn: new Date(),
+          motivoAnulacion: motivo.trim(),
+          saldo: '0.00',
+          facturaCompraId: null,
+        },
+      );
+      if (compra.facturaCompraId) await m.delete(FacturaCompra, { id: compra.facturaCompraId });
     });
     return this.detalle(id);
   }
@@ -248,6 +355,7 @@ export class ComprasService {
     await this.ds.transaction(async (m) => {
       const compra = await m.getRepository(Compra).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!compra) throw new NotFoundException('Compra no encontrada');
+      if (compra.estado === EstadoCompra.ANULADA) throw new ConflictException('La compra está anulada');
       if (dec(dto.monto).gt(compra.saldo)) {
         throw new BadRequestException(
           `El pago supera el saldo pendiente (${compra.moneda === 'USD' ? '$' : 'Bs'} ${compra.saldo})`,
@@ -271,7 +379,7 @@ export class ComprasService {
   async detalle(id: number): Promise<Compra> {
     const compra = await this.ds.getRepository(Compra).findOne({
       where: { id },
-      relations: { proveedor: true, lineas: true, pagos: { usuario: true }, usuario: true },
+      relations: { proveedor: true, lineas: true, pagos: { usuario: true }, usuario: true, orden: true },
       order: { lineas: { id: 'ASC' }, pagos: { id: 'ASC' } },
     });
     if (!compra) throw new NotFoundException('Compra no encontrada');
@@ -289,7 +397,8 @@ export class ComprasService {
       .addOrderBy('c.id', 'DESC');
     if (c.proveedorId) q.andWhere('c.proveedor_id = :prov', { prov: c.proveedorId });
     if (c.pago === 'pendientes') q.andWhere('c.saldo > 0');
-    if (c.pago === 'pagadas') q.andWhere('c.saldo = 0');
+    if (c.pago === 'anuladas') q.andWhere(`c.estado = 'ANULADA'`);
+    if (c.pago === 'pagadas') q.andWhere(`c.saldo = 0 AND c.estado = 'REGISTRADA'`);
     const texto = c.q?.trim();
     if (texto) q.andWhere('(c.numero ILIKE :t OR f_normalizar(p.razon_social) LIKE f_normalizar(:t))', { t: `%${texto}%` });
     const [datos, total] = await q
