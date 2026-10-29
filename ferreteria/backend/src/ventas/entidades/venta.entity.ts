@@ -202,6 +202,10 @@ export class VentaLinea {
   /** precioBs × cantidad, sin IVA. */
   @Column({ type: 'numeric', precision: 18, scale: 2 })
   subtotalBs: string;
+
+  /** Costo de reposición en USD por unidad base al vender (para calcular la ganancia). Null en ventas anteriores. */
+  @Column({ type: 'numeric', precision: 18, scale: 4, nullable: true })
+  costoUsd: string | null;
 }
 
 @Entity('ventas_pagos')

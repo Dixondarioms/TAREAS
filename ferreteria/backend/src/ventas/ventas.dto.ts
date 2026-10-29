@@ -19,7 +19,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ConsultaPaginada } from '../comun/paginacion';
-import { EsDecimal, EsRif } from '../comun/validadores';
+import { EsDecimal } from '../comun/validadores';
 import { EstadoVenta } from './entidades/venta.entity';
 import { TipoMovimientoCaja } from './entidades/movimiento-caja.entity';
 import { TipoDocumento } from './entidades/talonario.entity';
@@ -28,7 +28,10 @@ import { METODOS_EFECTIVO, MetodoPago } from './metodos-pago';
 // ------------------------------------------------------------------ clientes
 
 export class CrearClienteDto {
-  @EsRif()
+  /** RIF o cédula; solo números se toman como cédula venezolana (V-). El servicio lo valida y normaliza. */
+  @IsString()
+  @MinLength(5)
+  @MaxLength(15)
   documento: string;
 
   @IsString()
@@ -45,6 +48,17 @@ export class CrearClienteDto {
   @IsString()
   @MaxLength(60)
   telefono?: string | null;
+
+  /** Solo gerencia: deuda máxima en USD (0 = sin crédito). */
+  @IsOptional()
+  @EsDecimal({ min: '0', decimales: 2 })
+  limiteCreditoUsd?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  diasCredito?: number;
 }
 
 export class ActualizarClienteDto extends PartialType(CrearClienteDto) {}
@@ -287,4 +301,20 @@ export class CrearNotaCreditoDto {
 
   @IsEnum(MetodoPago)
   reintegroMetodo: MetodoPago;
+}
+
+// ------------------------------------------------------------------ cobranza
+
+export class AbonoClienteDto {
+  @IsEnum(MetodoPago)
+  metodo: MetodoPago;
+
+  /** En la moneda del método. */
+  @EsDecimal({ min: '0.01', decimales: 2 })
+  monto: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  referencia?: string;
 }

@@ -19,6 +19,7 @@ import {
   METODOS,
   CajaActual,
   cajaAbierta,
+  EstadoCuenta,
   simboloMoneda,
   Venta,
 } from '../lib/ventas';
@@ -75,6 +76,11 @@ export function PuntoDeVenta() {
   const [lineas, setLineas] = useState<LineaCarrito[]>([]);
   const [listaId, setListaId] = useState('');
   const [cliente, setCliente] = useState<Cliente | null>(null);
+  const credito = useQuery({
+    queryKey: ['clientes', 'estado', cliente?.id],
+    queryFn: () => api.get<EstadoCuenta>(`/clientes/${cliente!.id}/estado-cuenta`),
+    enabled: Boolean(cliente && Number(cliente.limiteCreditoUsd) > 0),
+  });
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
   const [cobrando, setCobrando] = useState(false);
@@ -357,7 +363,7 @@ export function PuntoDeVenta() {
         </Tarjeta>
 
         <div className="space-y-5">
-          <SelectorCliente cliente={cliente} alCambiar={setCliente} />
+          <SelectorCliente cliente={cliente} alCambiar={setCliente} credito={credito.data} />
           <Tarjeta titulo="Total">
             <div className="space-y-1 text-sm">
               <Selector
@@ -408,6 +414,7 @@ export function PuntoDeVenta() {
           lineas={cuerpoLineas}
           listaId={listaId}
           clienteId={cliente?.id ?? null}
+          creditoDisponibleUsd={credito.data ? credito.data.disponibleUsd : null}
           totalBs={c.totalBs}
           tasa={c.tasa.valor}
           alCerrar={() => setCobrando(false)}
@@ -419,6 +426,7 @@ export function PuntoDeVenta() {
             void consultas.invalidateQueries({ queryKey: ['productos'] });
             void consultas.invalidateQueries({ queryKey: ['inventario'] });
             void consultas.invalidateQueries({ queryKey: ['ventas'] });
+            void consultas.invalidateQueries({ queryKey: ['clientes'] });
           }}
         />
       )}
@@ -437,7 +445,15 @@ function Fila({ texto, valor }: { texto: string; valor: string }) {
   );
 }
 
-function SelectorCliente({ cliente, alCambiar }: { cliente: Cliente | null; alCambiar: (c: Cliente | null) => void }) {
+function SelectorCliente({
+  cliente,
+  alCambiar,
+  credito,
+}: {
+  cliente: Cliente | null;
+  alCambiar: (c: Cliente | null) => void;
+  credito?: EstadoCuenta;
+}) {
   const avisos = useAvisos();
   const [documento, setDocumento] = useState('');
   const [registrando, setRegistrando] = useState(false);
@@ -474,6 +490,12 @@ function SelectorCliente({ cliente, alCambiar }: { cliente: Cliente | null; alCa
           <div>
             <div className="font-medium text-slate-900">{cliente.nombre}</div>
             <div className="text-slate-500">{cliente.documento}</div>
+            {credito && (
+              <div className={`cifra text-xs ${Number(credito.vencidoUsd) > 0 ? 'text-red-700' : 'text-slate-500'}`}>
+                Crédito disponible $ {numero(credito.disponibleUsd, 2)} · debe $ {numero(credito.saldoUsd, 2)}
+                {Number(credito.vencidoUsd) > 0 && ` (vencido $ ${numero(credito.vencidoUsd, 2)})`}
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -553,6 +575,7 @@ function ModalCobro({
   lineas,
   listaId,
   clienteId,
+  creditoDisponibleUsd,
   totalBs,
   tasa,
   alCerrar,
@@ -561,6 +584,8 @@ function ModalCobro({
   lineas: { productoId: number; presentacionId: number | null; cantidad: string }[];
   listaId: string;
   clienteId: number | null;
+  /** Null si el cliente no compra a crédito. */
+  creditoDisponibleUsd: string | null;
   totalBs: string;
   tasa: string;
   alCerrar: () => void;
@@ -588,6 +613,11 @@ function ModalCobro({
   /** Lo que falta, expresado en la moneda del método (USD redondeado hacia arriba al céntimo). */
   const faltanteEn = (m: MetodoPago) => {
     if (faltante <= 0) return '';
+    if (m === 'CREDITO') {
+      // No más de lo que le queda de crédito.
+      const disponibleBs = Math.floor(Number(creditoDisponibleUsd ?? 0) * Number(tasa) * 100) / 100;
+      return Math.min(faltante, disponibleBs).toFixed(2);
+    }
     if (METODOS[m].moneda === 'BS') return faltante.toFixed(2);
     // Con IGTF el monto en divisas también genera impuesto: se estima por encima y el vuelto ajusta.
     const factor = c?.cobraIgtf ? 1.03 : 1;
@@ -677,7 +707,7 @@ function ModalCobro({
               value={nuevo.metodo}
               onChange={(e) => setNuevo({ ...nuevo, metodo: e.target.value as MetodoPago, monto: '' })}
             >
-              {LISTA_METODOS.map((m) => (
+              {[...LISTA_METODOS, ...(creditoDisponibleUsd !== null ? (['CREDITO'] as const) : [])].map((m) => (
                 <option key={m} value={m}>
                   {METODOS[m].nombre}
                 </option>

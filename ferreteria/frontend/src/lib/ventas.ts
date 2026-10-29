@@ -1,6 +1,7 @@
 import { AlicuotaIva, UsuarioSesion } from './tipos';
 
-export type MetodoPago = 'EFECTIVO_BS' | 'EFECTIVO_USD' | 'PAGO_MOVIL' | 'TRANSFERENCIA' | 'PUNTO_VENTA' | 'ZELLE' | 'BINANCE';
+export type MetodoPago =
+  'EFECTIVO_BS' | 'EFECTIVO_USD' | 'PAGO_MOVIL' | 'TRANSFERENCIA' | 'PUNTO_VENTA' | 'ZELLE' | 'BINANCE' | 'CREDITO';
 
 /** Igual que en la API (ventas/metodos-pago.ts). */
 export const METODOS: Record<MetodoPago, { nombre: string; moneda: 'BS' | 'USD'; referencia: boolean; vuelto: boolean }> = {
@@ -11,9 +12,11 @@ export const METODOS: Record<MetodoPago, { nombre: string; moneda: 'BS' | 'USD';
   PUNTO_VENTA: { nombre: 'Punto de venta', moneda: 'BS', referencia: false, vuelto: false },
   ZELLE: { nombre: 'Zelle', moneda: 'USD', referencia: true, vuelto: false },
   BINANCE: { nombre: 'Binance (USDT)', moneda: 'USD', referencia: true, vuelto: false },
+  CREDITO: { nombre: 'Crédito (fiado)', moneda: 'BS', referencia: false, vuelto: false },
 };
 
-export const LISTA_METODOS = Object.keys(METODOS) as MetodoPago[];
+/** Métodos con los que entra o sale dinero (sin el crédito, que es fiado). */
+export const LISTA_METODOS = (Object.keys(METODOS) as MetodoPago[]).filter((m) => m !== 'CREDITO');
 
 /** «Bs 1.234,56» o «$ 12,00» según la moneda del método. */
 export const simboloMoneda = (m: MetodoPago) => (METODOS[m].moneda === 'USD' ? '$' : 'Bs');
@@ -24,6 +27,49 @@ export interface Cliente {
   nombre: string;
   direccion: string | null;
   telefono: string | null;
+  limiteCreditoUsd: string;
+  diasCredito: number;
+  /** En listados: deuda actual en USD. */
+  saldoUsd?: string;
+}
+
+export interface EstadoCuenta {
+  cliente: Cliente;
+  saldoUsd: string;
+  disponibleUsd: string;
+  vencidoUsd: string;
+  cuentas: {
+    id: number;
+    ventaId: number;
+    factura: string;
+    fecha: string;
+    vencimiento: string;
+    montoUsd: string;
+    saldoUsd: string;
+    diasVencida: number;
+  }[];
+  abonos: {
+    id: number;
+    metodo: string;
+    monto: string;
+    montoBs: string;
+    tasa: string;
+    montoUsd: string;
+    referencia: string | null;
+    usuario?: { nombre: string };
+    creadoEn: string;
+  }[];
+}
+
+export interface PorCobrar {
+  clientes: {
+    cliente: { id: number; documento: string; nombre: string; telefono: string | null };
+    saldoUsd: string;
+    vencidoUsd: string;
+    diasVencida: number;
+  }[];
+  totalUsd: string;
+  vencidoUsd: string;
 }
 
 export type TipoDocumento = 'FACTURA' | 'NOTA_CREDITO';
@@ -146,7 +192,8 @@ export interface ResumenCaja {
     observaciones: string | null;
     usuario?: { nombre: string };
   };
-  ventas: { cantidad: number; anuladas: number; totalBs: string; igtfBs: string };
+  ventas: { cantidad: number; anuladas: number; totalBs: string; igtfBs: string; creditoBs: string };
+  abonos: MontosPorMetodo;
   cobrado: MontosPorMetodo;
   vuelto: MontosPorMetodo;
   reintegros: MontosPorMetodo;

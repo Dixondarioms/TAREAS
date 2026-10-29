@@ -7,12 +7,14 @@ import { Pagina } from '../comun/paginacion';
 import { Rol } from '../usuarios/rol.enum';
 import { MovimientoCaja, TipoMovimientoCaja } from './entidades/movimiento-caja.entity';
 import { EstadoCaja, MontosPorMetodo, SesionCaja } from './entidades/sesion-caja.entity';
-import { MetodoPago, METODOS_PAGO } from './metodos-pago';
+import { MetodoPago, METODOS_FUERA_DE_CAJA, METODOS_PAGO } from './metodos-pago';
 import { AbrirCajaDto, BuscarSesionesDto, CerrarCajaDto, MovimientoCajaDto } from './ventas.dto';
 
 export interface ResumenCaja {
   sesion: SesionCaja;
-  ventas: { cantidad: number; anuladas: number; totalBs: string; igtfBs: string };
+  ventas: { cantidad: number; anuladas: number; totalBs: string; igtfBs: string; creditoBs: string };
+  /** Abonos de clientes a sus deudas, en la moneda del método. */
+  abonos: MontosPorMetodo;
   /** Cobrado por método (sin restar vuelto), en la moneda del método. */
   cobrado: MontosPorMetodo;
   vuelto: MontosPorMetodo;
@@ -177,9 +179,24 @@ export class CajaService {
       [MetodoPago.EFECTIVO_BS]: dec(sesion.fondoBs),
       [MetodoPago.EFECTIVO_USD]: dec(sesion.fondoUsd),
     };
+    let credito = dec(0);
     for (const p of pagos) {
+      // Lo fiado no entra a la caja: se informa aparte y no se cuenta al cerrar.
+      if (METODOS_FUERA_DE_CAJA.includes(p.metodo as MetodoPago)) {
+        credito = credito.plus(p.monto);
+        continue;
+      }
       sumar(cobrado, p.metodo, dec(p.monto));
       sumar(esperado, p.metodo, dec(p.monto));
+    }
+    const abonosCaja: { metodo: string; monto: string }[] = await m.query(
+      `SELECT metodo, sum(monto) AS monto FROM abonos_cliente WHERE sesion_id = $1 GROUP BY metodo`,
+      [sesion.id],
+    );
+    const abonos: Record<string, Dec> = {};
+    for (const a of abonosCaja) {
+      sumar(abonos, a.metodo, dec(a.monto));
+      sumar(esperado, a.metodo, dec(a.monto));
     }
     for (const v of vueltos) {
       sumar(vuelto, v.metodo, dec(v.monto));
@@ -187,6 +204,7 @@ export class CajaService {
     }
     const reintegros: Record<string, Dec> = {};
     for (const r of reintegrosNc) {
+      if (METODOS_FUERA_DE_CAJA.includes(r.metodo as MetodoPago)) continue;
       sumar(reintegros, r.metodo, dec(r.monto));
       sumar(esperado, r.metodo, dec(r.monto).negated());
     }
@@ -210,7 +228,9 @@ export class CajaService {
         anuladas: Number(ventas.anuladas),
         totalBs: dec(ventas.total).toFixed(2),
         igtfBs: dec(ventas.igtf).toFixed(2),
+        creditoBs: credito.toFixed(2),
       },
+      abonos: aTextos(abonos),
       cobrado: aTextos(cobrado),
       vuelto: aTextos(vuelto),
       reintegros: aTextos(reintegros),

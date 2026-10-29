@@ -16,6 +16,7 @@ import { Proveedor } from '../proveedores/proveedor.entity';
 import { TasaCambio } from '../tasas/tasa-cambio.entity';
 import { Usuario } from '../usuarios/usuario.entity';
 import { Cliente } from '../ventas/entidades/cliente.entity';
+import { AbonoCliente, AplicacionAbono, CuentaCobrar } from '../ventas/entidades/cuenta-cobrar.entity';
 import { FacturaAnulada } from '../ventas/entidades/factura-anulada.entity';
 import { MovimientoCaja } from '../ventas/entidades/movimiento-caja.entity';
 import { NotaCredito, NotaCreditoLinea } from '../ventas/entidades/nota-credito.entity';
@@ -53,4 +54,7 @@ export const ENTIDADES = [
   Compra,
   CompraLinea,
   PagoProveedor,
+  CuentaCobrar,
+  AbonoCliente,
+  AplicacionAbono,
 ];

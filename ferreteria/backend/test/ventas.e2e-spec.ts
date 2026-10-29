@@ -285,7 +285,7 @@ describe('Fase 3: punto de venta, caja y talonarios (integración)', () => {
   describe('caja', () => {
     it('calcula lo esperado por método: fondo + cobrado − vuelto ± movimientos', async () => {
       const r = (await cajero.get('/caja/actual').expect(200)).body;
-      expect(r.ventas).toEqual({ cantidad: 3, anuladas: 1, totalBs: '20527.00', igtfBs: '22.62' });
+      expect(r.ventas).toEqual({ cantidad: 3, anuladas: 1, totalBs: '20527.00', igtfBs: '22.62', creditoBs: '0.00' });
       expect(r.cobrado).toEqual({ EFECTIVO_USD: '10.00', PAGO_MOVIL: '2393.00', EFECTIVO_BS: '17000.00', ZELLE: '7.77' });
       expect(r.esperado).toEqual({
         EFECTIVO_BS: '16479.62', // 100 + 17.000 − 620 − 0,38

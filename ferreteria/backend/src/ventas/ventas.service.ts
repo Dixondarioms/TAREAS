@@ -4,7 +4,7 @@ import { DataSource, EntityManager, In } from 'typeorm';
 import { ListaPrecio } from '../catalogo/entidades/lista-precio.entity';
 import { Producto } from '../catalogo/entidades/producto.entity';
 import { UsuarioSesion } from '../comun/decoradores';
-import { dec } from '../comun/dinero';
+import { dec, DECIMALES_BS, redondear } from '../comun/dinero';
 import { ZONA_HORARIA } from '../comun/fechas';
 import { Pagina } from '../comun/paginacion';
 import { ConfiguracionService } from '../configuracion/configuracion.service';
@@ -14,6 +14,7 @@ import { Moneda } from '../tasas/tasa-cambio.entity';
 import { TasasService } from '../tasas/tasas.service';
 import { Rol } from '../usuarios/rol.enum';
 import { CajaService } from './caja.service';
+import { CobranzaService } from './cobranza.service';
 import { calcularVenta, LineaACalcular, VentaCalculada } from './calculo-venta';
 import { Cliente } from './entidades/cliente.entity';
 import { EstadoCaja } from './entidades/sesion-caja.entity';
@@ -33,6 +34,8 @@ interface LineaPreparada extends LineaACalcular {
   factor: string;
   /** cantidad × factor: lo que sale del inventario. */
   cantidadBase: string;
+  /** Costo de reposición por unidad base al momento de vender. */
+  costoUsd: string;
 }
 
 export interface Cotizacion extends VentaCalculada {
@@ -51,6 +54,7 @@ export class VentasService {
     private readonly caja: CajaService,
     private readonly talonarios: TalonariosService,
     private readonly inventario: InventarioService,
+    private readonly cobranza: CobranzaService,
   ) {}
 
   private async lista(m: EntityManager, listaId?: number): Promise<ListaPrecio> {
@@ -98,6 +102,7 @@ export class VentasService {
         cantidadBase: dec(l.cantidad).times(factor).toDecimalPlaces(3).toFixed(3),
         precioUsd: dec(precio.precioUsd).times(factor).toFixed(4),
         alicuotaIva: p.alicuotaIva,
+        costoUsd: p.costoUsd,
       };
     });
   }
@@ -152,6 +157,11 @@ export class VentasService {
         vueltoMetodo,
       );
       if (dec(c.faltanteBs).gt(0)) throw new BadRequestException(`Faltan Bs ${c.faltanteBs} por cobrar`);
+      const creditoBs = c.pagos.filter((p) => p.metodo === MetodoPago.CREDITO).reduce((s, p) => s.plus(p.montoBs), dec(0));
+      if (creditoBs.gt(0) && !dto.clienteId) throw new BadRequestException('Para vender a crédito elija el cliente');
+      if (creditoBs.gt(0) && dec(c.vueltoBs).gt(0)) {
+        throw new BadRequestException('Una venta a crédito no puede dar vuelto: reduzca el monto fiado');
+      }
 
       let cliente: Cliente | null = null;
       if (dto.clienteId) {
@@ -207,9 +217,13 @@ export class VentasService {
             precioUsd: c.lineas[i].precioUsd,
             precioBs: c.lineas[i].precioBs,
             subtotalBs: c.lineas[i].subtotalBs,
+            costoUsd: l.costoUsd,
           }),
         ),
       );
+      if (creditoBs.gt(0)) {
+        await this.cobranza.abrirCuenta(m, venta.id, cliente!.id, redondear(creditoBs.div(tasa.valor), DECIMALES_BS));
+      }
       await m.save(
         dto.pagos.map((p, i) =>
           m.create(VentaPago, {
@@ -261,6 +275,7 @@ export class VentasService {
       venta.anuladaEn = new Date();
       venta.anuladaPorId = usuario.id;
       venta.motivoAnulacion = dto.motivo.trim();
+      await this.cobranza.anularDeVenta(m, id);
       await m.update(
         Venta,
         { id },

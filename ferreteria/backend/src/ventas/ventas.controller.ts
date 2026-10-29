@@ -5,9 +5,11 @@ import { Rol } from '../usuarios/rol.enum';
 import { CajaService } from './caja.service';
 import { TipoDocumento } from './entidades/talonario.entity';
 import { ClientesService } from './clientes.service';
+import { CobranzaService } from './cobranza.service';
 import { NotasCreditoService } from './notas-credito.service';
 import { TalonariosService } from './talonarios.service';
 import {
+  AbonoClienteDto,
   AbrirCajaDto,
   ActualizarClienteDto,
   AnularNumeroDto,
@@ -29,7 +31,10 @@ import { VentasService } from './ventas.service';
 @Controller('clientes')
 @Roles(Rol.GERENTE, Rol.CAJERO)
 export class ClientesController {
-  constructor(private readonly servicio: ClientesService) {}
+  constructor(
+    private readonly servicio: ClientesService,
+    private readonly cobranza: CobranzaService,
+  ) {}
 
   @Get()
   buscar(@Query() c: BuscarClientesDto) {
@@ -42,13 +47,32 @@ export class ClientesController {
   }
 
   @Post()
-  crear(@Body() dto: CrearClienteDto) {
-    return this.servicio.crear(dto);
+  crear(@Body() dto: CrearClienteDto, @UsuarioActual() u: UsuarioSesion) {
+    return this.servicio.crear(dto, u);
   }
 
   @Put(':id')
-  actualizar(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarClienteDto) {
-    return this.servicio.actualizar(id, dto);
+  actualizar(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarClienteDto, @UsuarioActual() u: UsuarioSesion) {
+    return this.servicio.actualizar(id, dto, u);
+  }
+
+  /** Clientes que deben, del más atrasado al más al día. */
+  @Get('por-cobrar')
+  @Roles(Rol.GERENTE)
+  porCobrar() {
+    return this.cobranza.porCobrar();
+  }
+
+  /** Deuda, cuentas y abonos del cliente. */
+  @Get(':id/estado-cuenta')
+  estadoCuenta(@Param('id', ParseIntPipe) id: number) {
+    return this.cobranza.estadoCuenta(id);
+  }
+
+  /** Abono a la deuda: el dinero entra a la caja abierta de quien lo recibe. */
+  @Post(':id/abonos')
+  abonar(@Param('id', ParseIntPipe) id: number, @Body() dto: AbonoClienteDto, @UsuarioActual() u: UsuarioSesion) {
+    return this.cobranza.abonar(id, dto, u);
   }
 }
 

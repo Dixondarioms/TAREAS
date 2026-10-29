@@ -6,6 +6,8 @@ export enum MetodoPago {
   PUNTO_VENTA = 'PUNTO_VENTA',
   ZELLE = 'ZELLE',
   BINANCE = 'BINANCE',
+  /** Venta fiada: queda como cuenta por cobrar del cliente, en USD. */
+  CREDITO = 'CREDITO',
 }
 
 export type MonedaPago = 'BS' | 'USD';
@@ -27,7 +29,11 @@ export const METODOS_PAGO: Record<MetodoPago, DefinicionMetodo> = {
   [MetodoPago.PUNTO_VENTA]: { nombre: 'Punto de venta', moneda: 'BS', referencia: false, vuelto: false },
   [MetodoPago.ZELLE]: { nombre: 'Zelle', moneda: 'USD', referencia: true, vuelto: false },
   [MetodoPago.BINANCE]: { nombre: 'Binance (USDT)', moneda: 'USD', referencia: true, vuelto: false },
+  [MetodoPago.CREDITO]: { nombre: 'Crédito (fiado)', moneda: 'BS', referencia: false, vuelto: false },
 };
+
+/** No mueven dinero en la caja: no cuentan en lo esperado ni en el arqueo. */
+export const METODOS_FUERA_DE_CAJA: MetodoPago[] = [MetodoPago.CREDITO];
 
 /** Métodos en efectivo: los únicos que admiten retiros, gastos e ingresos de caja. */
 export const METODOS_EFECTIVO = [MetodoPago.EFECTIVO_BS, MetodoPago.EFECTIVO_USD] as const;

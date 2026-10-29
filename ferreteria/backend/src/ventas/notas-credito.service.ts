@@ -9,10 +9,11 @@ import { InventarioService } from '../inventario/inventario.service';
 import { TipoMovimiento } from '../inventario/movimiento-inventario.entity';
 import { Rol } from '../usuarios/rol.enum';
 import { CajaService } from './caja.service';
+import { CobranzaService } from './cobranza.service';
 import { NotaCredito, NotaCreditoLinea } from './entidades/nota-credito.entity';
 import { TipoDocumento } from './entidades/talonario.entity';
 import { EstadoVenta, Venta } from './entidades/venta.entity';
-import { METODOS_PAGO } from './metodos-pago';
+import { MetodoPago, METODOS_PAGO } from './metodos-pago';
 import { formatoNumero, TalonariosService } from './talonarios.service';
 import { CrearNotaCreditoDto } from './ventas.dto';
 
@@ -25,6 +26,7 @@ export class NotasCreditoService {
     private readonly caja: CajaService,
     private readonly talonarios: TalonariosService,
     private readonly inventario: InventarioService,
+    private readonly cobranza: CobranzaService,
   ) {}
 
   /**
@@ -33,7 +35,8 @@ export class NotasCreditoService {
    * que se indique lo contrario.
    */
   async crear(ventaId: number, dto: CrearNotaCreditoDto, usuario: UsuarioSesion): Promise<NotaCredito> {
-    if (!METODOS_PAGO[dto.reintegroMetodo].vuelto) {
+    const aCuenta = dto.reintegroMetodo === MetodoPago.CREDITO;
+    if (!aCuenta && !METODOS_PAGO[dto.reintegroMetodo].vuelto) {
       throw new BadRequestException(`No se puede reintegrar por ${METODOS_PAGO[dto.reintegroMetodo].nombre}`);
     }
     const id = await this.ds.transaction(async (m) => {
@@ -83,7 +86,7 @@ export class NotasCreditoService {
       const ivaGeneral = b2(montoIva(bases.GENERAL, venta.porcentajeGeneral));
       const ivaReducida = b2(montoIva(bases.REDUCIDA, venta.porcentajeReducida));
       const total = bases.EXENTO.plus(bases.GENERAL).plus(ivaGeneral).plus(bases.REDUCIDA).plus(ivaReducida);
-      const enUsd = METODOS_PAGO[dto.reintegroMetodo].moneda === 'USD';
+      const enUsd = !aCuenta && METODOS_PAGO[dto.reintegroMetodo].moneda === 'USD';
       const reintegro = enUsd ? b2(total.div(venta.tasa)) : total;
 
       if (dto.reintegroMetodo.startsWith('EFECTIVO')) {
@@ -134,6 +137,16 @@ export class NotasCreditoService {
           }),
         ),
       );
+
+      if (aCuenta) {
+        await this.cobranza.descontarNotaCredito(m, {
+          ventaId,
+          notaCreditoId: nota.id,
+          totalBs: total,
+          tasa: venta.tasa,
+          usuarioId: usuario.id,
+        });
+      }
 
       if (dto.devolverInventario) {
         const porProducto = new Map<number, Dec>();

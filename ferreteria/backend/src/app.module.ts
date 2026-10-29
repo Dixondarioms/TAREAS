@@ -10,6 +10,7 @@ import { ConfiguracionModule } from './configuracion/configuracion.module';
 import { FiscalModule } from './fiscal/fiscal.module';
 import { InventarioModule } from './inventario/inventario.module';
 import { ProveedoresModule } from './proveedores/proveedores.module';
+import { ReportesModule } from './reportes/reportes.module';
 import { SaludController } from './salud.controller';
 import { SemillasModule } from './semillas/semillas.module';
 import { TasasModule } from './tasas/tasas.module';
@@ -30,6 +31,7 @@ import { VentasModule } from './ventas/ventas.module';
     VentasModule,
     FiscalModule,
     ComprasModule,
+    ReportesModule,
     SemillasModule,
   ],
   controllers: [SaludController],

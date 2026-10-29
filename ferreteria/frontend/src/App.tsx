@@ -7,6 +7,7 @@ import { Rol } from './lib/tipos';
 import { AjustePrecios } from './paginas/AjustePrecios';
 import { Caja } from './paginas/Caja';
 import { Catalogos } from './paginas/Catalogos';
+import { Clientes } from './paginas/Clientes';
 import { CompraFormulario } from './paginas/CompraFormulario';
 import { Compras } from './paginas/Compras';
 import { Configuracion } from './paginas/Configuracion';
@@ -19,6 +20,7 @@ import { LibrosFiscales } from './paginas/LibrosFiscales';
 import { Login } from './paginas/Login';
 import { ProductoFormulario } from './paginas/ProductoFormulario';
 import { PuntoDeVenta } from './paginas/PuntoDeVenta';
+import { Reportes } from './paginas/Reportes';
 import { Productos } from './paginas/Productos';
 import { Proveedores } from './paginas/Proveedores';
 import { Tasas } from './paginas/Tasas';
@@ -91,6 +93,22 @@ export function App() {
           element={
             <Restringido roles={['GERENTE', 'ALMACEN']}>
               <CompraFormulario />
+            </Restringido>
+          }
+        />
+        <Route
+          path="clientes"
+          element={
+            <Restringido roles={['GERENTE', 'CAJERO']}>
+              <Clientes />
+            </Restringido>
+          }
+        />
+        <Route
+          path="reportes"
+          element={
+            <Restringido roles={['GERENTE']}>
+              <Reportes />
             </Restringido>
           }
         />

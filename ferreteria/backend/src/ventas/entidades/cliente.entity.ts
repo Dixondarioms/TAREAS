@@ -20,6 +20,14 @@ export class Cliente {
   @Column({ type: 'varchar', length: 60, nullable: true })
   telefono: string | null;
 
+  /** Deuda máxima permitida en USD; 0 = no compra a crédito. */
+  @Column({ type: 'numeric', precision: 18, scale: 2, default: 0 })
+  limiteCreditoUsd: string;
+
+  /** Plazo de pago de las ventas a crédito. */
+  @Column({ type: 'int', default: 30 })
+  diasCredito: number;
+
   @CreateDateColumn({ type: 'timestamptz' })
   creadoEn: Date;
 

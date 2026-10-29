@@ -271,7 +271,7 @@ function ListaNotas({ notas }: { notas: NotaCredito[] }) {
   );
 }
 
-const METODOS_REINTEGRO: MetodoPago[] = ['EFECTIVO_BS', 'EFECTIVO_USD', 'PAGO_MOVIL'];
+const METODOS_REINTEGRO: MetodoPago[] = ['EFECTIVO_BS', 'EFECTIVO_USD', 'PAGO_MOVIL', 'CREDITO'];
 
 function FormNotaCredito({ venta, notas, alTerminar }: { venta: Venta; notas: NotaCredito[]; alTerminar: () => void }) {
   const avisos = useAvisos();
@@ -373,7 +373,7 @@ function FormNotaCredito({ venta, notas, alTerminar }: { venta: Venta; notas: No
         >
           {METODOS_REINTEGRO.map((m) => (
             <option key={m} value={m}>
-              {METODOS[m].nombre}
+              {m === 'CREDITO' ? 'Descontar de la deuda (venta fiada)' : METODOS[m].nombre}
             </option>
           ))}
         </Selector>
